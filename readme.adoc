@@ -1,0 +1,231 @@
+= D0-SML to SMA Energy Meter converter
+Joern Tuemmler
+v1.0, June 2019: Final
+:doctype: article
+:encoding: utf-8
+:lang: en
+:toc: left
+:toclevels: 3
+:sectnums:
+:icons: font
+:source-highlighter: coderay
+
+== Introduction
+
+This sketch may be used to read SML telegrams from an infrared D0 interface, convert it to SMA energy-meter telegrams and send it via UDP.
+
+So far it has been tested with the following meters:
+
+* https://www.dzg.de/fileadmin/dzg/content/downloads/produkte-zaehler/dvs74/dzg_dvs74_handbuch.pdf[DWS74] from Deutsche Zählergesellschaft Oranienburg mbH
+
+As hardware you need:
+
+* an ESP8266 (tested with NodeMCUv2 and WeMos D1 mini)
+* or a Raspberry Pi (tested with a Raspberry Pi 2)
+* a BPW40 phototransistor
+* and optionally a 1 KOhm resistor (only needed with a Raspberry Pi)
+
+[CAUTION]
+====
+The source-code and the information in this document is provided _as is_. Use it at your own risk!
+====
+
+****
+Thanks to Frank Carius for sharing his work. https://www.msxfaq.de/sonst/bastelbude/smartmeter_d0_sml.code.htm[His sketch] was the initial basis of this sketch.
+****
+
+== Setup
+
+=== ESP8266
+
+==== Hardware
+
+Attach the BPW40 phototransistor to your ESP8266:
+
+* Short leg (collector, anode) to RxD
+* Long leg (emitter, cathode) to GND
+
+[NOTE]
+====
+TxD is used to print debug-output.
+====
+
+==== Software
+
+You need the https://www.arduino.cc/en/Main/Software[Arduino IDE] in order to compile and flash the sketch to the ESP8266.
+
+Follow the instructions on https://github.com/esp8266/Arduino[ESP8266 github project page] or  https://www.heise.de/ct/artikel/Arduino-IDE-installieren-und-fit-machen-fuer-ESP8266-und-ESP32-4130814.html[from ct magazine] to setup your environment.
+
+.Configuration
+If you have setup the IDE, copy the *settings.h.tpl* file to  *settings.h* and check the default settings. At least *WIFI_SSID* and *WIFI_PASSWORD* need to be defined.
+
+For more details on configuring the software check the comments in the settings file.
+
+=== Raspberry Pi
+
+The software was originally developed for an ESP8266. Experimental support for the Raspberry Pi has been added and tested with a RaspberryPi 2.
+
+==== Hardware
+
+Check the documentation from https://raspberry.tips/raspberrypi-tutorials/smartmeter-stromzaehler-mit-dem-raspberry-pi-auslesen-und-aufzeichnen[raspberry.tips] for settings up the Raspberry Pi and the hardware. In short:
+
+* Short leg (collector, anode) of the BPW40 to RxD
+* Long leg (emitter, cathode) of the BPW40 to GND
+* Put the resistor between RxD and 3,3V
+
+[NOTE]
+====
+In the https://pgoergen.de/de/2018/05/build-a-smartmeter-reading-head-for-1e/[tutorial] of Paul Görgen the BPW40 is used without a resistor. In my case this didn't work and only fragments were received. Adding the resistor fixed that problem.
+====
+
+
+==== Software
+
+You can compile the code directly on a Raspberry Pi. First run CMake to create a makefile, then use make to compile the application:
+
+....
+mkdir build
+cd build
+cmake ..
+make
+....
+
+Please note that you have to configure your Raspberry Pi to use the serial interface for an own application (see documentation above) and to setup communication parameters to 9600 8N1.
+
+Start the application by specifying the port, e.g.:
+
+....
+./sml2emeter /dev/ttyAMA0
+....
+
+.Configuration
+Copy the *settings.h.tpl* file to  *settings.h* and check the default settings. *WIFI_SSID* and *WIFI_PASSWORD* will be ignored, because the application relies on the normal network setup of the Raspberry Pi.
+
+For more details on configuring the software check the comments in the settings file.
+
+== Background information
+
+=== Developing on a PC
+
+For faster and more comfortable development it is possible to use https://visualstudio.microsoft.com/de/[Visual Studio] or a GNU toolchain for compiling the sketch and running it on a PC. To create a solution, you need to run https://cmake.org[CMake] first.
+
+=== Links
+
+* https://www.bsi.bund.de/SharedDocs/Downloads/DE/BSI/Publikationen/TechnischeRichtlinien/TR03109/TR-03109-1_Anlage_Feinspezifikation_Drahtgebundene_LMN-Schnittstelle_Teilb.pdf?__blob=publicationFile[Technische Richtlinie BSI TR-03109-1 / SML]
+* https://www.bundesnetzagentur.de/DE/Service-Funktionen/Beschlusskammern/BK06/BK6_81_GPKE_GeLi/Mitteilung_Nr_20/Anlagen/Obis-Kennzahlen-System_2.0.pdf?__blob=publicationFile&v=2[OBIS-Kennzahlen-System]
+* https://www.promotic.eu/en/pmdoc/Subsystems/Comm/PmDrivers/IEC62056_OBIS.htm[OBIS codes]
+* https://www.sma.de/fileadmin/content/global/Partner/Documents/SMA_Labs/EMETER-Protokoll-TI-de-10.pdf[SMA ENERGY METER Zählerprotokoll]
+
+=== Example SML message
+
+.General structure of a SML message
+....
+SML {
+	transactionId
+	groupNo
+	abortOnError
+	messageBody
+	crc16
+	endOfMsg
+}
+....
+
+.Example message
+....
+76                                                list
+   05 52 f1 58 00                                 string = R.X.
+   62 00                                          uint = 0
+   62 00                                          uint = 0
+   72                                             list
+      63 01 01                                    uint = 257		OpenResponse
+      76                                          list
+         01                                       optional, not used
+         01                                       optional, not used
+         02 31                                    string = 1
+         0b 0a 01 44 5a 47 00 ff 00 ff 00         string = ..DZG.....
+         72                                       list
+        62 01                                     uint   type of time (01 unsigned32, 02 sml timestamp, 03 localtimestamp)
+            64 1d a6 aa                           uint = 1943210
+         62 02                                    uint = 2
+   63 d4 f4                                       uint = 54516
+   00                                             endOfMessage
+76                                                list
+   05 53 f1 58 00                                 string = S.X.
+   62 00                                          uint = 0
+   62 00                                          uint = 0
+   72                                             list
+      63 07 01                                    uint = 1793		GetListRes
+      77                                          list
+         01                                       optional, not used
+         0b 0a 01 44 5a 47 00 ff 00 ff 00         string = ..DZG.....
+         07 01 00 62 0a ff ff                     string = ......
+         72                                       list
+            62 01                                 uint = 1
+            64 1d a6 aa                           uint = 1943210
+         75                                       list
+            77                                    list
+               07 01 00 60 01 00 ff               octed	objectName    Hardware version
+               01                                 optional, not used
+               72                                 list
+                  62 01                           uint = 1
+                  62 00                           uint = 0
+               62 00                              uint = 0
+               52 00                              int = 0
+               04 44 5a 47                        string = DZG
+               01                                 optional, not used
+            77                                    list
+               07 01 00 60 01 00 ff               octed	objectName    Device identification
+               01                                 optional, not used
+               72                                 list
+                  62 01                           uint = 1
+                  62 00                           uint = 0
+               62 00                              uint = 0
+               52 00                              int = 0
+               0b 0a 01 44 5a 47 00 ff 00 ff 00   string = ..DZG.....
+               01                                 optional, not used
+            77                                    list
+               07 01 00 01 08 00 ff               octed	objectName    Positive active energy (A+) total [Wh]
+               64 1c 01 04                        uint = 1835268
+               72                                 list
+                  62 01                           uint = 1
+                  62 00                           uint = 0
+               62 1e                              uint = 30                Unit
+               52 ff                              int = 255                Scale 10 ^ -1 = 0,01
+               64 26 78 f4                        uint = 2521332           252133,2 Wh -> 252,1332 kWh -> 907679520 Ws
+               01                                 optional, not used
+            77                                    list
+               07 01 00 02 08 00 ff               octed	objectName      Negative active energy (A+) total [Wh]
+               01                                 optional, not used
+               72                                 list
+                  62 01                           uint = 1
+                  62 00                           uint = 0
+               62 1e                              uint = 30                 Unit
+               52 ff                              int = 255                 Scale 10 ^ -1 = 0,01
+               62 00                              uint = 0
+               01                                 optional, not used
+            77                                    list
+               07 01 00 10 07 00 ff               octed	objectName     Sum active instantaneous power (A+ - A-) [W] (must be split to 1.4.0 and 2.4.0)
+               01                                 optional, not used
+               72                                 list
+                  62 01                           uint = 1
+                  62 00                           uint = 0
+               62 1b                              uint = 27
+               52 fe                              int = 254                10 ^ -2 = 0,01
+               53 48 7a                           int = 18554              185,54 W
+               01                                 optional, not used
+         01                                       optional, not used
+         01                                       optional, not used
+   63 9a 1e                                       uint = 39454
+   00                                             endOfMessage
+76                                                list
+   05 54 f1 58 00                                 string = T.X.
+   62 00                                          uint = 0
+   62 00                                          uint = 0
+   72                                             list
+      63 02 01                                    uint = 513		CloseRes
+      71                                          list
+         01                                       optional, not used
+   63 60 79                                       uint = 24697
+   00                                             endOfMessage
+00                                                endOfMessage
+....
