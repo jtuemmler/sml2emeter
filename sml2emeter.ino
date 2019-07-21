@@ -5,12 +5,10 @@
 * telegrams and send it via UDP.
 * 
 * Dependencies:
-* IotWebConf, 2.3.0
+* IotWebConf, Version 2.3.0
 *
 * Configuration:
-* Copy the settings.h.tpl file to settings.h and check the default settings.
-* At least the WiFi settings have to be adapted to your network settings.
-*
+* This sketch provides a web-server for configuration.
 * For more details, see the readme:
 * https://github.com/jtuemmler/sml2emeter/blob/master/readme.adoc
 */
@@ -21,12 +19,16 @@
 #include "util/sml_testpacket.h"
 
 // ----------------------------------------------------------------------------
-// Settings
+// Compile time settings
 // ----------------------------------------------------------------------------
 
-#include "settings.h"
-
+// Application version
 const char VERSION[] = "Version 1.1";
+
+// Use demo data
+//  Set to false, to read data from serial port or to
+//  true: Use build-in demo data
+const bool USE_DEMO_DATA = false;
 
 // ----------------------------------------------------------------------------
 // SML constants
@@ -95,6 +97,9 @@ const int INITIAL_PAYLOAD_LENGTH = 12;
 
 // Default multicast address for energy meter packets
 const IPAddress MCAST_ADDRESS = IPAddress(239, 12, 255, 254);
+
+// Port used for energy meter packets
+const uint16_t DESTINATION_PORT = 9522;
 
 // ----------------------------------------------------------------------------
 // Constants for IotWebConf
@@ -266,7 +271,7 @@ void initEmeterPacket(uint32_t serNo) {
 /**
 * @brief Read the next value from a sml packet
 * @note This Reader ignores lists tags. If a list occurs, it will
-*       return the next value after the list.
+*       return the next value after the list-tag.
 */
 uint64_t getSmlValue(uint8_t *pPacket, int *pOffset) {
    int p = *pOffset;
@@ -565,12 +570,7 @@ void setup() {
    // Signal Serial OK
    blink(2, 100, 500, 2000);   
 
-   if (SER_NO == 0) {
-      itoa(990000000 + ESP.getChipId(), serialNumberValue, 10);
-   }
-   else {
-      itoa(SER_NO, serialNumberValue, 10);
-   }
+   itoa(990000000 + ESP.getChipId(), serialNumberValue, 10);
    itoa(DESTINATION_PORT, portValue, 10);
    
    //!!!iotWebConf.setConfigPin(CONFIG_PIN);
