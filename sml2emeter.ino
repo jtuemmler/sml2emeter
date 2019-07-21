@@ -3,6 +3,9 @@
 *
 * ﻿This sketch may be used to read SML telegrams from an infrared D0 interface, convert it to SMA energy-meter 
 * telegrams and send it via UDP.
+* 
+* Dependencies:
+* IotWebConf, 2.3.0
 *
 * Configuration:
 * Copy the settings.h.tpl file to settings.h and check the default settings.
@@ -12,6 +15,7 @@
 * https://github.com/jtuemmler/sml2emeter/blob/master/readme.adoc
 */
 
+#include <IotWebConf.h>
 #include <ESP8266WiFi.h>
 #include <WiFiUDP.h>
 #include "util/sml_testpacket.h"
@@ -87,9 +91,43 @@ const uint8_t SMA_METER_HEADER[] = { 'S', 'M', 'A', 0,                         /
 // Initial length of the payload (Protocol-ID + SRC + Time)
 const int INITIAL_PAYLOAD_LENGTH = 12;
 
+// Default multicast address for energy meter packets
+const IPAddress MCAST_ADDRESS = IPAddress(239, 12, 255, 254);
+
+// ----------------------------------------------------------------------------
+// Constants for IotWebConf
+// ----------------------------------------------------------------------------
+
+// Initial name of the Thing. Used e.g. as SSID of the own Access Point.
+const char THING_NAME[] = "sml2emeter";
+
+// Initial password to connect to the Thing, when it creates an own Access Point.
+const char WIFI_INITIAL_AP_PASSWORD[] = "sml2emeter";
+
+const int STRING_LEN = 128;
+const int NUMBER_LEN = 32;
+
+// Configuration specific key. The value should be modified if config structure was changed.
+const char CONFIG_VERSION[] = "dem6";
+
+// When CONFIG_PIN is pulled to ground on startup, the Thing will use the initial
+//   password to buld an AP. (E.g. in case of lost password)
+const int CONFIG_PIN = D2;
+
+// Status indicator pin.
+//      First it will light up (kept LOW), on Wifi connection it will blink,
+//      when connected to the Wifi it will turn off (kept HIGH).
+const int STATUS_PIN = LED_BUILTIN;
+
 // ----------------------------------------------------------------------------
 // Global variables
 // ----------------------------------------------------------------------------
+
+// Current meter reading
+uint32_t powerIn = 0;
+uint32_t powerOut = 0;
+uint32_t energyIn = 0;
+uint32_t energyOut = 0;
 
 // Buffer for serial reading
 const int SML_PACKET_SIZE = 1000;
@@ -108,8 +146,37 @@ uint8_t *pMeterDataSize;
 // Pointer to the time field in the energy meter packet
 uint8_t *pMeterTime;
 
+// Destination addresses for sending meter packets
+const int DEST_ADRESSES_SIZE = 2;
+IPAddress destAddresses[DEST_ADRESSES_SIZE];
+uint8_t numDestAddresses = 0;
+
+// Destination port
+uint16_t port = DESTINATION_PORT;
+
 // UDP instance for sending packets
 WiFiUDP Udp;
+
+// DNS server instance
+DNSServer dnsServer;
+
+// Webserver instance
+WebServer server(80);
+
+// IotWebConf instance
+IotWebConf iotWebConf(THING_NAME, &dnsServer, &server, WIFI_INITIAL_AP_PASSWORD, CONFIG_VERSION);
+
+// User-defined configuration values for IotWebConf
+char destinationAddress1Value[STRING_LEN] = "";
+char destinationAddress2Value[STRING_LEN] = "";
+char serialNumberValue[NUMBER_LEN] = "";
+char portValue[NUMBER_LEN] = "";
+
+IotWebConfSeparator separator1("Meter configuration");
+IotWebConfParameter serialNumberParam("Serial number","serialNumber",serialNumberValue,NUMBER_LEN,"number",serialNumberValue,serialNumberValue,"min='0' max='999999999' step='1'");
+IotWebConfParameter destinationAddress1Param("Unicast address 1","destinationAddress1",destinationAddress1Value,STRING_LEN,"");
+IotWebConfParameter destinationAddress2Param("Unicast address 2","destinationAddress2",destinationAddress2Value,STRING_LEN,"");
+IotWebConfParameter portParam("Port","port",portValue,NUMBER_LEN,"number",portValue,portValue,"min='0' max='65535' step='1'");
 
 /**
 * @brief Turn status led on
@@ -261,6 +328,7 @@ uint16_t updateEmeterPacket(uint8_t *pSmlPacket, int smlLength) {
                   case OBIS_POSITIVE_ACTIVE_POWER:
                      pPacketPos = storeU32BE(pPacketPos, SMA_POSITIVE_ACTIVE_POWER);
                      pPacketPos = storeU32BE(pPacketPos, intValue);
+                     powerIn = intValue;
                      pPacketPos = storeU32BE(pPacketPos, SMA_POSITIVE_REACTIVE_POWER);
                      pPacketPos = storeU32BE(pPacketPos, 0);
                      length += 16;
@@ -268,6 +336,7 @@ uint16_t updateEmeterPacket(uint8_t *pSmlPacket, int smlLength) {
                   case OBIS_NEGATIVE_ACTIVE_POWER:
                      pPacketPos = storeU32BE(pPacketPos, SMA_NEGATIVE_ACTIVE_POWER);
                      pPacketPos = storeU32BE(pPacketPos, intValue);
+                     powerOut = intValue;
                      pPacketPos = storeU32BE(pPacketPos, SMA_NEGATIVE_REACTIVE_POWER);
                      pPacketPos = storeU32BE(pPacketPos, 0);
                      length += 16;
@@ -275,10 +344,12 @@ uint16_t updateEmeterPacket(uint8_t *pSmlPacket, int smlLength) {
                   case OBIS_SUM_ACTIVE_POWER:
                      pPacketPos = storeU32BE(pPacketPos, SMA_POSITIVE_ACTIVE_POWER);
                      pPacketPos = storeU32BE(pPacketPos, intValue >= 0 ? intValue : 0);
+                     powerIn = intValue >= 0 ? intValue : 0;
                      pPacketPos = storeU32BE(pPacketPos, SMA_POSITIVE_REACTIVE_POWER);
                      pPacketPos = storeU32BE(pPacketPos, 0);
                      pPacketPos = storeU32BE(pPacketPos, SMA_NEGATIVE_ACTIVE_POWER);
                      pPacketPos = storeU32BE(pPacketPos, intValue <= 0 ? -intValue : 0);
+                     powerOut = intValue <= 0 ? -intValue : 0;
                      pPacketPos = storeU32BE(pPacketPos, SMA_NEGATIVE_REACTIVE_POWER);
                      pPacketPos = storeU32BE(pPacketPos, 0);
                      length += 32;
@@ -292,6 +363,13 @@ uint16_t updateEmeterPacket(uint8_t *pSmlPacket, int smlLength) {
                   *(pPacketPos++) = tariff;
                   pPacketPos = storeU64BE(pPacketPos, value);
                   length += 12;
+                  switch (index) {
+                  case OBIS_POSITIVE_ACTIVE_POWER:
+                     energyIn = (uint32_t)(value / 3600);
+                     break;
+                  case OBIS_NEGATIVE_ACTIVE_POWER:
+                     energyOut = (uint32_t)(value / 3600);                    
+                  }
                }
             }
             else {
@@ -338,6 +416,7 @@ int readSerial() {
       }
       else {
          delay(5);  // wait 5 ms for new packets
+         iotWebConf.doLoop();
       }
    }
 
@@ -351,6 +430,108 @@ int readSerial() {
 }
 
 /**
+* @brief Read test packet
+*/
+int readTestPacket() {
+    Serial.print("W");
+    for (int i = 0; i < 500; i += 5) {
+      iotWebConf.doLoop();
+      delay(5);
+    }
+    Serial.print("R");
+    ledOn();    
+    delay(500);
+    memcpy(smlPacket, SML_TEST_PACKET, SML_TEST_PACKET_LENGTH);
+    ledOff();
+    return SML_TEST_PACKET_LENGTH;
+}
+
+/**
+ * @brief Handle web requests to "/" path.
+ */
+void handleRoot()
+{
+   // Let IotWebConf test and handle captive portal requests.
+   if (iotWebConf.handleCaptivePortal()) {
+      // Captive portal request were already served.
+      return;
+   }
+
+   IotWebConfHtmlFormatProvider *pHtmlFormatProvider = iotWebConf.getHtmlFormatProvider();
+   String page = pHtmlFormatProvider->getHead();
+   page.replace("{v}", "SML 2 EMeter");
+   page += pHtmlFormatProvider->getStyle();
+   page += pHtmlFormatProvider->getHeadExtension();
+   page += pHtmlFormatProvider->getHeadEnd();
+   page += "<form><fieldset><legend>Current readings</legend>";
+   page += "<table border>";
+   page += "<tr><th>Direction</th><th>Power (W)</th><th>Energy (kWh)</th></tr>";
+   page += "<tr><td>In</td><td>";
+   page += powerIn / 10.0;
+   page += "</td><td>";
+   page += energyIn / 1000.0;
+   page += "</td></tr>";
+   page += "<tr><td>Out</td><td>";
+   page += powerOut / 10.0;
+   page += "</td><td>";
+   page += energyOut / 1000.0;
+   page += "</td></tr>";
+   page += "</table>";
+   page += "</fieldset></form>";
+   page += "<p>Change <a href='config'>settings</a>.</p>";
+   page += pHtmlFormatProvider->getEnd();
+
+   server.send(200, "text/html", page);
+}
+
+/**
+ * @brief Check, whether a valid IP address is given
+ */
+boolean checkIp(IotWebConfParameter &parameter) {
+  IPAddress ip;
+
+  String arg = server.arg(parameter.getId());
+  if (arg.length() > 0) {
+    if (!ip.fromString(arg)) {
+      parameter.errorMessage = "IP address is not valid!";
+      return false;
+    }
+  }
+  return true;
+}
+
+/**
+ * @brief Validate input in the form
+ */
+boolean formValidator() {
+  Serial.println("Validating form.");
+  boolean valid = checkIp(destinationAddress1Param) && checkIp(destinationAddress2Param);
+
+  return valid;
+}
+
+/**
+ * @brief Process changed configuration
+ */
+void configSaved() {
+  Serial.println("Configuration was updated.");
+  port = atoi(portValue);
+  numDestAddresses = 0;
+  if (destAddresses[numDestAddresses].fromString(destinationAddress1Value)) {
+    ++numDestAddresses;
+  }
+  if (destAddresses[numDestAddresses].fromString(destinationAddress2Value)) {
+    ++numDestAddresses;
+  }
+
+  Serial.print("serNo: "); Serial.println(serialNumberValue);
+  Serial.print("port: "); Serial.println(port);
+  Serial.print("numDestAddresses: "); Serial.println(numDestAddresses);
+
+  initEmeterPacket(atoi(serialNumberValue));
+}
+
+/**
 * @brief Setup the sketch
 */
 void setup() {
@@ -358,10 +539,12 @@ void setup() {
    pinMode(LED_BUILTIN, OUTPUT);
    // Signal startup
    blink(1, 5000, 500, 1000); 
+   
    // Open serial communications and wait for port to open      
    Serial.begin(9600);
    while (!Serial);
 
+   Serial.println();
    Serial.println("ESP8266-D0 to SMA Energy Meter");
    Serial.print("Chip-ID: ");
    Serial.println(ESP.getChipId());
@@ -373,36 +556,32 @@ void setup() {
    // Signal Serial OK
    blink(2, 100, 500, 2000);   
 
-   Serial.print("Start WiFi to SSID: ");
-   Serial.println(WIFI_SSID);
-   WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
-   int retries = 5;
-   while (WiFi.status() != WL_CONNECTED) {
-      --retries;
-      blink(3, 50, 100, 2000);
-      if (retries <= 0) {
-         Serial.println("Failed to init WiFi ... restart!");
-         ESP.restart();
-      }
-   }
-
-   Serial.print("Connected. IP:");
-   Serial.println(WiFi.localIP());
-
-   // Signal WiFi OK
-   blink(4, 100, 500, 2000);
-
    if (SER_NO == 0) {
-      initEmeterPacket(990000000 + ESP.getChipId());
+      itoa(990000000 + ESP.getChipId(), serialNumberValue, 10);
    }
    else {
-      initEmeterPacket(SER_NO);
+      itoa(SER_NO, serialNumberValue, 10);
    }
+   itoa(DESTINATION_PORT, portValue, 10);
+   
+   //!!!iotWebConf.setConfigPin(CONFIG_PIN);
+   iotWebConf.addParameter(&separator1);
+   iotWebConf.addParameter(&destinationAddress1Param);
+   iotWebConf.addParameter(&destinationAddress2Param);
+   iotWebConf.addParameter(&portParam);
+   iotWebConf.addParameter(&serialNumberParam);
+   iotWebConf.setConfigSavedCallback(&configSaved);
+   iotWebConf.setFormValidator(&formValidator);
+   iotWebConf.getApTimeoutParameter()->visible = false;
 
-   if (USE_MULTICAST) {
-      // Multicast IP address used for energy meter telegrams
-      destinationAddress = IPAddress(239, 12, 255, 254);
-   }
+   // Initializing the configuration.
+   iotWebConf.init();
+   configSaved();
+
+   // Set up required URL handlers on the web server.
+   server.on("/", handleRoot);
+   server.on("/config", [] { iotWebConf.handleConfig(); });
+   server.onNotFound([]() { iotWebConf.handleNotFound(); });
 
    Serial.println("Initialization done.");
 }
@@ -411,41 +590,50 @@ void setup() {
 * @brief Main loop
 */
 void loop() {
+   // Do not process meter data, if we are not connected at all.
+   if ((iotWebConf.getState() != IOTWEBCONF_STATE_ONLINE) || (port == 0)) {
+      iotWebConf.doLoop();
+      return;
+   }
+   
    Serial.print("_");
 
+   // Read the next packet
    int smlPacketLength;
-
    if (!USE_DEMO_DATA) {
       smlPacketLength = readSerial();
    }
    else {
-      smlPacketLength = SML_TEST_PACKET_LENGTH;
-      memcpy(smlPacket, SML_TEST_PACKET, smlPacketLength);
-      delay(1000);
-   }
+      smlPacketLength = readTestPacket();
+   } 
 
+   // Send the packet if a valid telegram was received
    if (smlPacketLength <= SML_PACKET_SIZE) {
       uint32_t *pSmlHeader = (uint32_t*)smlPacket;
       if ((pSmlHeader[0] == SML_ESCAPE) && (pSmlHeader[1] == SML_VERSION1)) {
-         Serial.print("S");
 
-         if (USE_MULTICAST) {
-            Udp.beginPacketMulticast(destinationAddress, DESTINATION_PORT, WiFi.localIP(), 1);
-         }
-         else {
-            Udp.beginPacket(destinationAddress, DESTINATION_PORT);
-         }
+         int meterPacketLength = updateEmeterPacket(smlPacket, smlPacketLength);
+         int i = 0;
+         do {
+            Serial.print("S");
+            if (numDestAddresses == 0) {
+               Udp.beginPacketMulticast(MCAST_ADDRESS, port, WiFi.localIP(), 1);
+            }
+            else {
+               Udp.beginPacket(destAddresses[i], port);
+            }
 
-         if (SEND_EMETER_PACKET) {
-            int meterPacketLength = updateEmeterPacket(smlPacket, smlPacketLength);
-            Udp.write(meterPacket, meterPacketLength);
-         }
-         else {
-            Udp.write(smlPacket, smlPacketLength);
-         }
+            if (port == DESTINATION_PORT) {
+               Udp.write(meterPacket, meterPacketLength);
+            }
+            else {
+               Udp.write(smlPacket, smlPacketLength);
+            }
 
-         // Send paket
-         Udp.endPacket();
+            // Send paket
+            Udp.endPacket();
+            ++i;
+         } while (i < numDestAddresses);
       }
       else {
          Serial.print("E");
