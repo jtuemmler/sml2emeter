@@ -115,7 +115,7 @@ const int STRING_LEN = 128;
 const int NUMBER_LEN = 32;
 
 // Configuration specific key. The value should be modified if config structure was changed.
-const char CONFIG_VERSION[] = "dem6";
+const char CONFIG_VERSION[] = "v1";
 
 // When CONFIG_PIN is pulled to ground on startup, the Thing will use the initial
 //   password to buld an AP. (E.g. in case of lost password)
