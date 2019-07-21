@@ -26,6 +26,8 @@
 
 #include "settings.h"
 
+const char VERSION[] = "Version 1.1";
+
 // ----------------------------------------------------------------------------
 // SML constants
 // For details see:
@@ -162,6 +164,9 @@ DNSServer dnsServer;
 
 // Webserver instance
 WebServer server(80);
+
+// HTTP update server
+HTTPUpdateServer httpUpdater;
 
 // IotWebConf instance
 IotWebConf iotWebConf(THING_NAME, &dnsServer, &server, WIFI_INITIAL_AP_PASSWORD, CONFIG_VERSION);
@@ -479,6 +484,9 @@ void handleRoot()
    page += "</table>";
    page += "</fieldset></form>";
    page += "<p>Change <a href='config'>settings</a>.</p>";
+   page += "<p>";
+   page += VERSION;
+   page += "</p>";
    page += pHtmlFormatProvider->getEnd();
 
    server.send(200, "text/html", page);
@@ -545,7 +553,8 @@ void setup() {
    while (!Serial);
 
    Serial.println();
-   Serial.println("ESP8266-D0 to SMA Energy Meter");
+   Serial.print("ESP8266-D0 to SMA Energy Meter ");
+   Serial.println(VERSION);
    Serial.print("Chip-ID: ");
    Serial.println(ESP.getChipId());
    Serial.print("Flash-chip-ID: ");
@@ -572,6 +581,7 @@ void setup() {
    iotWebConf.addParameter(&serialNumberParam);
    iotWebConf.setConfigSavedCallback(&configSaved);
    iotWebConf.setFormValidator(&formValidator);
+   iotWebConf.setupUpdateServer(&httpUpdater,"/update");
    iotWebConf.getApTimeoutParameter()->visible = false;
 
    // Initializing the configuration.
