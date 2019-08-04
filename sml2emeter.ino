@@ -23,7 +23,7 @@
 // ----------------------------------------------------------------------------
 
 // Application version
-const char VERSION[] = "Version 1.1";
+const char VERSION[] = "Version 1.2";
 
 // Use demo data
 //  Set to false, to read data from serial port or to
@@ -126,6 +126,7 @@ const int CONFIG_PIN = D2;
 //      when connected to the Wifi it will turn off (kept HIGH).
 const int STATUS_PIN = LED_BUILTIN;
 
+const char INDEX_HTML[] = "<!doctype html><title>SML 2 EMeter</title><script>function u(n,t){var r=new XMLHttpRequest;r.onreadystatechange=function(){if(4==r.readyState&&200==r.status){var t=JSON.parse(r.responseText),e=\"\";for(var a in t)e=e.concat(\"<tr><td>{k}</td><td>{v}</td></tr>\".replace(\"{k}\",a).replace(\"{v}\",t[a]));document.getElementById(n).innerHTML=\"<table border><tr><th>Name</th><th>Value</th></tr>{d}</table>\".replace(\"{d}\",e)}},r.open(\"GET\",t,!0),r.send()}function r(){u(\"data\",\"data\")}function i(){r();self.setInterval(function(){r()},5e3)}</script><style>table{width:95%}th{background-color:#666;color:#fff}tr{background-color:#fffbf0;color:#000}tr:nth-child(odd){background-color:#e4ebf2}</style><body onload=i()><p>Current readings:<div id=data> </div><p>Change <a href=config>settings</a>.<p>{v}";
 // ----------------------------------------------------------------------------
 // Global variables
 // ----------------------------------------------------------------------------
@@ -135,6 +136,7 @@ uint32_t powerIn = 0;
 uint32_t powerOut = 0;
 uint32_t energyIn = 0;
 uint32_t energyOut = 0;
+uint32_t readErrors = 0;
 
 // Buffer for serial reading
 const int SML_PACKET_SIZE = 1000;
@@ -423,17 +425,18 @@ int readSerial() {
       else if (flashcount > 500) {
          ledOff();
          flashcount = 0;
+         ++readErrors;
       }
       else {
-         delay(5);  // wait 5 ms for new packets
          iotWebConf.doLoop();
+         delay(5);
       }
    }
 
    // We got some bytes. Read until next pause
    Serial.print("R");
    ledOn();
-   Serial.setTimeout(500);
+   Serial.setTimeout(200);
    int serialLen = Serial.readBytes(smlPacket, SML_PACKET_SIZE);
    ledOff();
    return serialLen;
@@ -467,6 +470,7 @@ void handleRoot()
       return;
    }
 
+   /*
    IotWebConfHtmlFormatProvider *pHtmlFormatProvider = iotWebConf.getHtmlFormatProvider();
    String page = pHtmlFormatProvider->getHead();
    page.replace("{v}", "SML 2 EMeter");
@@ -495,8 +499,28 @@ void handleRoot()
    page += pHtmlFormatProvider->getEnd();
 
    server.send(200, "text/html", page);
+   */
+   String page = INDEX_HTML;
+   page.replace("{v}",VERSION);
+   server.send(200, "text/html", page);
 }
 
+void handleData() {
+   String data = "{";
+   data += "\"PowerIn\" : ";
+   data += powerIn / 10.0;
+   data += ",\"EnergyIn\" : ";
+   data += energyIn / 1000.0;
+   data += ",\"PowerOut\" : ";
+   data += powerOut / 10.0;
+   data += ",\"EnergyOut\" : ";
+   data += energyOut / 1000.0;
+   data += ",\"Errors\" : ";
+   data += readErrors;
+   data += "}";
+
+   server.send(200, "application/json", data);
+}
 /**
  * @brief Check, whether a valid IP address is given
  */
@@ -590,6 +614,7 @@ void setup() {
 
    // Set up required URL handlers on the web server.
    server.on("/", handleRoot);
+   server.on("/data", [] { handleData(); });
    server.on("/config", [] { iotWebConf.handleConfig(); });
    server.onNotFound([]() { iotWebConf.handleNotFound(); });
 
@@ -647,11 +672,13 @@ void loop() {
       }
       else {
          Serial.print("E");
+         ++readErrors;
       }
    }
    else {
       // Error
       blink(10, 100, 100, 2000);
+      ++readErrors;
    }
    Serial.println(".");
 }
