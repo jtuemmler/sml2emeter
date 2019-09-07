@@ -9,8 +9,8 @@
 #include <stdio.h>
 #include <string.h>
 #include <inttypes.h>
-#include <stdlib.h>
 #include <string>
+#include <stdlib.h>
 
 using namespace std;
 
@@ -24,7 +24,6 @@ using namespace std;
 
 typedef uint8_t byte;
 typedef uint16_t word;
-typedef bool boolean;
 
 // ----------------------------------------------------------------------------
 // String handling
@@ -44,15 +43,17 @@ public:
       return *this;
    }
 
-   String& operator += (const float other) {
-      char converted[20];
-      sprintf(converted,"%g",other);
+   String& operator += (const double other) {
+      char converted[20] = { 0 };
+      snprintf(converted,sizeof(converted) - 1, "%g", other);
       std::string::append(converted);
       return *this;
    }
 };
 
+#ifndef _WIN32
 char *itoa(int value, char * str, int base);
+#endif
 
 // ----------------------------------------------------------------------------
 // Time

@@ -108,11 +108,13 @@ int SerialImpl::readBytes(byte *pBuffer, int bufferSize) {
    return length;
 }
 
+#ifndef _WIN32
 char *itoa(int value, char *str, int base)
 {
    sprintf(str,"%d",value);
    return str;
 }
+#endif
 
 String::String() : std::string() {}
 

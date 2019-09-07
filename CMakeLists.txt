@@ -15,7 +15,6 @@ add_executable(smlparser
 
 add_executable(sml2emeter
    sml2emeter.ino
-   settings.h
    util/main.cpp
    util/sml_testpacket.h
    util/arduino_stubs.h

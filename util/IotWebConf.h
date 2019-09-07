@@ -41,7 +41,7 @@ public:
          const char* label, const char* id, char* valueBuffer, int length,
          const char* type = "text", const char* placeholder = NULL,
          const char* defaultValue = NULL, const char* customHtml = NULL,
-         boolean visible = true) {
+         bool visible = true) {
       this->visible = visible;
    }
    IotWebConfParameter(
@@ -65,16 +65,16 @@ public:
    void setStatusPin(int statusPin) {}
    void setupUpdateServer(
          HTTPUpdateServer* updateServer, const char* updatePath = "/firmware") {}
-   boolean init() { return true; }
+   bool init() { return true; }
    void doLoop() {}
-   boolean handleCaptivePortal() { return true; }
+   bool handleCaptivePortal() { return true; }
    void handleConfig() {}
    void handleNotFound() {}
    void setWifiConnectionCallback(std::function<void()> func) {}
    void setConfigSavedCallback(std::function<void()> func) {}
-   void setFormValidator(std::function<boolean()> func) {}
+   void setFormValidator(std::function<bool()> func) {}
    void setApConnectionHandler(
-         std::function<boolean(const char* apName, const char* password)> func) {}
+         std::function<bool(const char* apName, const char* password)> func) {}
    void setWifiConnectionHandler(
          std::function<void(const char* ssid, const char* password)> func) {}
    bool addParameter(IotWebConfParameter* parameter) { return true; }

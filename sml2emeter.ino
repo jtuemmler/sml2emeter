@@ -494,7 +494,7 @@ void handleData() {
 /**
  * @brief Check, whether a valid IP address is given
  */
-boolean checkIp(IotWebConfParameter &parameter) {
+bool checkIp(IotWebConfParameter &parameter) {
   IPAddress ip;
 
   String arg = server.arg(parameter.getId());
@@ -510,9 +510,9 @@ boolean checkIp(IotWebConfParameter &parameter) {
 /**
  * @brief Validate input in the form
  */
-boolean formValidator() {
+bool formValidator() {
   Serial.println("Validating form.");
-  boolean valid = checkIp(destinationAddress1Param) && checkIp(destinationAddress2Param);
+  bool valid = checkIp(destinationAddress1Param) && checkIp(destinationAddress2Param);
 
   return valid;
 }
