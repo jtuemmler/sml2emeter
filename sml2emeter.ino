@@ -126,7 +126,7 @@ const int CONFIG_PIN = D2;
 //      when connected to the Wifi it will turn off (kept HIGH).
 const int STATUS_PIN = LED_BUILTIN;
 
-const char INDEX_HTML[] = "<!doctype html><title>SML 2 EMeter</title><script>function u(n,t){var r=new XMLHttpRequest;r.onreadystatechange=function(){if(4==r.readyState&&200==r.status){var t=JSON.parse(r.responseText),e=\"\";for(var a in t)e=e.concat(\"<tr><td>{k}</td><td>{v}</td></tr>\".replace(\"{k}\",a).replace(\"{v}\",t[a]));document.getElementById(n).innerHTML=\"<table border><tr><th>Name</th><th>Value</th></tr>{d}</table>\".replace(\"{d}\",e)}},r.open(\"GET\",t,!0),r.send()}function r(){u(\"data\",\"data\")}function i(){r();self.setInterval(function(){r()},5e3)}</script><style>table{width:95%}th{background-color:#666;color:#fff}tr{background-color:#fffbf0;color:#000}tr:nth-child(odd){background-color:#e4ebf2}</style><body onload=i()><p>Current readings:<div id=data> </div><p>Change <a href=config>settings</a>.<p>{v}";
+const char INDEX_HTML[] = "<!doctype html><title>SML 2 EMeter</title><script>function u(n,t){var r=new XMLHttpRequest;r.onreadystatechange=function(){if(4==r.readyState&&200==r.status){var t=JSON.parse(r.responseText),e=\"\";for(var a in t)e=e.concat(\"<tr><td>{k}</td><td>{v}</td></tr>\".replace(\"{k}\",a).replace(\"{v}\",t[a]));document.getElementById(n).innerHTML=\"<table border><tr><th>Name</th><th>Value</th></tr>{d}</table>\".replace(\"{d}\",e)}},r.open(\"GET\",t,!0),r.send()}function r(){u(\"data\",\"data\")}function i(){r();self.setInterval(function(){r()},5e3)}</script><style>table{width:95%}th{background-color:#666;color:#fff}tr{background-color:#fffbf0;color:#000}tr:nth-child(odd){background-color:#e4ebf2}</style><body onload=i()><p>Current readings:<div id=data> </div><p>Change <a href=config>settings</a>.<p>{v}";
 // ----------------------------------------------------------------------------
 // Global variables
 // ----------------------------------------------------------------------------
@@ -470,36 +470,6 @@ void handleRoot()
       return;
    }
 
-   /*
-   IotWebConfHtmlFormatProvider *pHtmlFormatProvider = iotWebConf.getHtmlFormatProvider();
-   String page = pHtmlFormatProvider->getHead();
-   page.replace("{v}", "SML 2 EMeter");
-   page += pHtmlFormatProvider->getStyle();
-   page += pHtmlFormatProvider->getHeadExtension();
-   page += pHtmlFormatProvider->getHeadEnd();
-   page += "<form><fieldset><legend>Current readings</legend>";
-   page += "<table border>";
-   page += "<tr><th>Direction</th><th>Power (W)</th><th>Energy (kWh)</th></tr>";
-   page += "<tr><td>In</td><td>";
-   page += powerIn / 10.0;
-   page += "</td><td>";
-   page += energyIn / 1000.0;
-   page += "</td></tr>";
-   page += "<tr><td>Out</td><td>";
-   page += powerOut / 10.0;
-   page += "</td><td>";
-   page += energyOut / 1000.0;
-   page += "</td></tr>";
-   page += "</table>";
-   page += "</fieldset></form>";
-   page += "<p>Change <a href='config'>settings</a>.</p>";
-   page += "<p>";
-   page += VERSION;
-   page += "</p>";
-   page += pHtmlFormatProvider->getEnd();
-
-   server.send(200, "text/html", page);
-   */
    String page = INDEX_HTML;
    page.replace("{v}",VERSION);
    server.send(200, "text/html", page);
@@ -597,7 +567,7 @@ void setup() {
    itoa(990000000 + ESP.getChipId(), serialNumberValue, 10);
    itoa(DESTINATION_PORT, portValue, 10);
    
-   //!!!iotWebConf.setConfigPin(CONFIG_PIN);
+   //iotWebConf.setConfigPin(CONFIG_PIN);
    iotWebConf.addParameter(&separator1);
    iotWebConf.addParameter(&destinationAddress1Param);
    iotWebConf.addParameter(&destinationAddress2Param);
@@ -613,9 +583,9 @@ void setup() {
    configSaved();
 
    // Set up required URL handlers on the web server.
-   server.on("/", handleRoot);
-   server.on("/data", [] { handleData(); });
-   server.on("/config", [] { iotWebConf.handleConfig(); });
+   server.on("/", []() { handleRoot(); });
+   server.on("/data", []() { handleData(); });
+   server.on("/config", []() { iotWebConf.handleConfig(); });
    server.onNotFound([]() { iotWebConf.handleNotFound(); });
 
    Serial.println("Initialization done.");

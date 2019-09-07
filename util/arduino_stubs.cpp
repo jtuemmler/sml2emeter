@@ -107,3 +107,13 @@ int SerialImpl::readBytes(byte *pBuffer, int bufferSize) {
 #endif
    return length;
 }
+
+char *itoa(int value, char *str, int base)
+{
+   sprintf(str,"%d",value);
+   return str;
+}
+
+String::String() : std::string() {}
+
+String::String(const char pOther[]) : std::string(pOther) {}

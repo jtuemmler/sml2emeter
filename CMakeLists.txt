@@ -1,6 +1,8 @@
 project(sml2emeter)
 
-cmake_minimum_required(VERSION 2.4)
+cmake_minimum_required(VERSION 3.1)
+
+set(CMAKE_CXX_STANDARD 11)
 
 include_directories(
    .
@@ -21,6 +23,7 @@ add_executable(sml2emeter
    util/WiFiUDP.h
    util/WiFiUDP.cpp
    util/ESP8266WiFi.h
+   util/IotWebConf.h
 )
 
 if(WIN32)

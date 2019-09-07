@@ -10,6 +10,9 @@
 #include <string.h>
 #include <inttypes.h>
 #include <stdlib.h>
+#include <string>
+
+using namespace std;
 
 #if _WIN32
 #  define _WINSOCK_DEPRECATED_NO_WARNINGS
@@ -21,6 +24,35 @@
 
 typedef uint8_t byte;
 typedef uint16_t word;
+typedef bool boolean;
+
+// ----------------------------------------------------------------------------
+// String handling
+// ----------------------------------------------------------------------------
+
+class String : public std::string {
+public:
+   String();
+   String(const char pOther[]);
+
+   void replace(const char s1[], const char s2[]) {}
+
+   operator const char*()  { return std::string::c_str(); }
+
+   String& operator += (const char pOther[]) {
+      std::string::append(pOther);
+      return *this;
+   }
+
+   String& operator += (const float other) {
+      char converted[20];
+      sprintf(converted,"%g",other);
+      std::string::append(converted);
+      return *this;
+   }
+};
+
+char *itoa(int value, char * str, int base);
 
 // ----------------------------------------------------------------------------
 // Time
@@ -63,6 +95,7 @@ public:
    }
    operator const char*() const { return inet_ntoa(_address.sin_addr); }
    struct sockaddr_in getAddress() { return _address; }
+   bool fromString(const String &address) { return false; }
 private:
    struct sockaddr_in _address;
 };
@@ -84,7 +117,7 @@ public:
    void print(int num) {
       printf("%d", num);
    }
-   void println(const char* msg) {
+   void println(const char* msg = "") {
       printf("%s\n", msg);
    }
    void println(int num) {
