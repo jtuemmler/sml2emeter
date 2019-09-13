@@ -9,8 +9,8 @@ include_directories(
    util
 )
 
-add_executable(smlparser
-   util/smlparser.cpp
+add_executable(smlprinter
+   util/smlprinter.cpp
 )
 
 add_executable(sml2emeter
@@ -23,6 +23,14 @@ add_executable(sml2emeter
    util/WiFiUDP.cpp
    util/ESP8266WiFi.h
    util/IotWebConf.h
+   util/crc16ccitt.h
+)
+
+add_executable(smlparser
+   util/smlparsertest.cpp
+   util/crc16ccitt.h
+   util/smlparser.h
+   util/sml_testpacket.h
 )
 
 if(WIN32)

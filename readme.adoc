@@ -129,42 +129,43 @@ SML {
 	endOfMsg
 }
 ....
+Reference: p. 17
 
 .Example message
 ....
-76                                                list
-   05 52 f1 58 00                                 string = R.X.
-   62 00                                          uint = 0
-   62 00                                          uint = 0
-   72                                             list
-      63 01 01                                    uint = 257		OpenResponse
+76                                                list                   SML message
+   05 52 f1 58 00                                 string = R.X.          transactionId
+   62 00                                          uint = 0               groupNo
+   62 00                                          uint = 0               abortOnError(0 == continue, p.19)
+   72                                             list                   messageBody (p.20)
+      63 01 01                                    uint = 257               SML_PublicOpen.Res (p.22)
       76                                          list
-         01                                       optional, not used
-         01                                       optional, not used
-         02 31                                    string = 1
-         0b 0a 01 44 5a 47 00 ff 00 ff 00         string = ..DZG.....
-         72                                       list
-        62 01                                     uint   type of time (01 unsigned32, 02 sml timestamp, 03 localtimestamp)
+         01                                       optional, not used         codepage
+         01                                       optional, not used         clientId
+         02 31                                    string = 1                 reqFileId
+         0b 0a 01 44 5a 47 00 ff 00 ff 00         string = ..DZG.....        serverId
+         72                                       list                       refTime
+            62 01                                 uint                         type of time(1 == unsigned)
             64 1d a6 aa                           uint = 1943210
-         62 02                                    uint = 2
-   63 d4 f4                                       uint = 54516
+         62 02                                    uint = 2                   smlVersion
+   63 d4 f4                                       uint = 54516           crc16
    00                                             endOfMessage
-76                                                list
-   05 53 f1 58 00                                 string = S.X.
-   62 00                                          uint = 0
-   62 00                                          uint = 0
-   72                                             list
-      63 07 01                                    uint = 1793		GetListRes
+76                                                list                   SML message
+   05 53 f1 58 00                                 string = S.X.          transactionId
+   62 00                                          uint = 0               groupNo
+   62 00                                          uint = 0               abortOnError(0 == continue, p.19)
+   72                                             list                   messageBody (p.20)
+      63 07 01                                    uint = 1793              SML_GetList.Res (p.36)
       77                                          list
-         01                                       optional, not used
-         0b 0a 01 44 5a 47 00 ff 00 ff 00         string = ..DZG.....
-         07 01 00 62 0a ff ff                     string = ......
-         72                                       list
+         01                                       optional, not used         clientId
+         0b 0a 01 44 5a 47 00 ff 00 ff 00         string = ..DZG.....        serviceId
+         07 01 00 62 0a ff ff                     string = ......            listName
+         72                                       list                       actSensorTime
             62 01                                 uint = 1
             64 1d a6 aa                           uint = 1943210
-         75                                       list
+         75                                       list                       valList
             77                                    list
-               07 01 00 60 01 00 ff               octed	objectName    Hardware version
+               07 01 00 60 01 00 ff               octed                      obis:Hardware version
                01                                 optional, not used
                72                                 list
                   62 01                           uint = 1
@@ -174,7 +175,7 @@ SML {
                04 44 5a 47                        string = DZG
                01                                 optional, not used
             77                                    list
-               07 01 00 60 01 00 ff               octed	objectName    Device identification
+               07 01 00 60 01 00 ff               octed                      obis:Device identification
                01                                 optional, not used
                72                                 list
                   62 01                           uint = 1
@@ -184,48 +185,48 @@ SML {
                0b 0a 01 44 5a 47 00 ff 00 ff 00   string = ..DZG.....
                01                                 optional, not used
             77                                    list
-               07 01 00 01 08 00 ff               octed	objectName    Positive active energy (A+) total [Wh]
-               64 1c 01 04                        uint = 1835268
+               07 01 00 01 08 00 ff               octed                      obis:Positive active energy (A+) total [Wh]
+               64 1c 01 04                        uint = 1835268             
                72                                 list
                   62 01                           uint = 1
                   62 00                           uint = 0
-               62 1e                              uint = 30                Unit
-               52 ff                              int = 255                Scale 10 ^ -1 = 0,01
-               64 26 78 f4                        uint = 2521332           252133,2 Wh -> 252,1332 kWh -> 907679520 Ws
+               62 1e                              uint = 30                  Unit
+               52 ff                              int = 255                  Scale 10 ^ -1 = 0,1
+               64 26 78 f4                        uint = 2521332             252133,2 Wh -> 252,1332 kWh -> 907679520 Ws
                01                                 optional, not used
             77                                    list
-               07 01 00 02 08 00 ff               octed	objectName      Negative active energy (A+) total [Wh]
+               07 01 00 02 08 00 ff               octed                      obis:Negative active energy (A+) total [Wh]
                01                                 optional, not used
                72                                 list
                   62 01                           uint = 1
                   62 00                           uint = 0
-               62 1e                              uint = 30                 Unit
-               52 ff                              int = 255                 Scale 10 ^ -1 = 0,01
+               62 1e                              uint = 30                  Unit
+               52 ff                              int = 255                  Scale 10 ^ -1 = 0,1
                62 00                              uint = 0
                01                                 optional, not used
             77                                    list
-               07 01 00 10 07 00 ff               octed	objectName     Sum active instantaneous power (A+ - A-) [W] (must be split to 1.4.0 and 2.4.0)
+               07 01 00 10 07 00 ff               octed                      obis:Sum active instantaneous power (A+ - A-) [W] (must be split to 1.4.0 and 2.4.0)
                01                                 optional, not used
                72                                 list
                   62 01                           uint = 1
                   62 00                           uint = 0
-               62 1b                              uint = 27
-               52 fe                              int = 254                10 ^ -2 = 0,01
-               53 48 7a                           int = 18554              185,54 W
+               62 1b                              uint = 27                  Unit
+               52 fe                              int = 254                  Scale 10 ^ -2 = 0,01
+               53 48 7a                           int = 18554                185,54 W
                01                                 optional, not used
-         01                                       optional, not used
-         01                                       optional, not used
-   63 9a 1e                                       uint = 39454
+         01                                       optional, not used	      listSignature
+         01                                       optional, not used	      actGatewayTime
+   63 9a 1e                                       uint = 39454           crc16
    00                                             endOfMessage
-76                                                list
-   05 54 f1 58 00                                 string = T.X.
-   62 00                                          uint = 0
-   62 00                                          uint = 0
-   72                                             list
-      63 02 01                                    uint = 513		CloseRes
+76                                                list                   SML message
+   05 54 f1 58 00                                 string = T.X.          transactionId
+   62 00                                          uint = 0               groupNo
+   62 00                                          uint = 0               abortOnError(0 == continue, p.19)
+   72                                             list                   messageBody (p.20)
+      63 02 01                                    uint = 513               SML_PublicClose.Res (p.23)
       71                                          list
-         01                                       optional, not used
-   63 60 79                                       uint = 24697
+         01                                       optional, not used         signature
+   63 60 79                                       uint = 24697           crc16
    00                                             endOfMessage
 00                                                endOfMessage
 ....
