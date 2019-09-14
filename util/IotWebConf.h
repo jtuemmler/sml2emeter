@@ -58,6 +58,9 @@ public:
    IotWebConfSeparator(const char *pCaption) {}
 };
 
+class IotWebConfWifiAuthInfo {
+};
+
 class IotWebConf {
 public:
    IotWebConf(const char *pThingName, const DNSServer *pDnsServer, const WebServer *pWebServer, const char *pApPassword, const char *pVersion) {}
@@ -77,6 +80,7 @@ public:
          std::function<bool(const char* apName, const char* password)> func) {}
    void setWifiConnectionHandler(
          std::function<void(const char* ssid, const char* password)> func) {}
+   void setWifiConnectionFailedHandler( std::function<IotWebConfWifiAuthInfo*()> func ) {}
    bool addParameter(IotWebConfParameter* parameter) { return true; }
    const char* getThingName() { return "Thing"; }
    void delay(unsigned long millis) { delay(millis); }
