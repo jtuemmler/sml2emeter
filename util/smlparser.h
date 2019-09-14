@@ -66,7 +66,7 @@ public:
       return true;
    }
 
-private:
+protected:
    // ----------------------------------------------------------------------------
    // SML constants
    // For details see:
@@ -239,15 +239,11 @@ private:
    int64_t getNextValue(int &pos) {
       uint8_t elementType = getType(pos);
       uint16_t elementLength = getLength(pos);
-      int64_t value = 0;
-      if (elementType == SML_INT_ID) {
-         for (int i = 1; i < elementLength; ++i) {
-            value = (value << 8) | (int64_t)((int8_t)_pPacket[pos++]);
-         }
-      }
-      else if (elementType == SML_UINT_ID) {
-         for (int i = 1; i < elementLength; ++i) {
-            value = (value << 8) | (int64_t)(_pPacket[pos++]);
+      int64_t value = 0UL;
+      if (((elementType == SML_INT_ID) || (elementType == SML_UINT_ID)) && elementLength > 1) {
+         value = (elementType == (int64_t)(SML_INT_ID) ? (int8_t)_pPacket[pos++] : _pPacket[pos++]);
+         for (int i = 2; i < elementLength; ++i) {
+            value = (value << 8) | _pPacket[pos++];
          }
       }
       else {
