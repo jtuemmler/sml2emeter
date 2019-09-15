@@ -140,7 +140,7 @@ protected:
          uint8_t tariff = _pPacket[pos++];
          ++pos;                  // Skip next value
          getNextElement(pos,2);  // Skip status and timestamp
-         uint8_t unit = (uint8_t)getNextValue(pos);
+         getNextValue(pos);      // Skip unit
          int8_t scale = (int8_t)getNextValue(pos);
          int64_t value = (int64_t)getNextValue(pos);
          getNextElement(pos);    // Skip signature
@@ -167,10 +167,10 @@ protected:
                case OBIS_ENERGY_TYPE:
                   switch (index) {
                      case OBIS_POSITIVE_ACTIVE_POWER:
-                        _energyInWh = value;
+                        _energyInWh = (uint64_t)value;
                         break;
                      case OBIS_NEGATIVE_ACTIVE_POWER:
-                        _energyOutWh = value;
+                        _energyOutWh = (uint64_t)value;
                         break;
                   }
                   break;

@@ -9,12 +9,15 @@
 class Crc16Ccitt {
 public:
    /// Initialization value for FCS calculation
-   static const uint16_t u16InitFcs = 0xffff;
+   static const uint16_t INIT_FCS = 0xFFFFU;
+
+   static const uint16_t HI_BYTE_MASK = 0xFF00U;
+   static const uint16_t LO_BYTE_MASK = 0x00FFU;
 
    /**
     * @brief Constructor
     */
-   Crc16Ccitt(uint16_t u16Init = u16InitFcs) {
+   Crc16Ccitt(uint16_t u16Init = INIT_FCS) {
       init(u16Init);
    }
 
@@ -22,7 +25,7 @@ public:
     * @brief Init crc calculation
     * @param u16Init    Initialization value
     */
-   inline void init(uint16_t u16Init = u16InitFcs) {
+   inline void init(uint16_t u16Init = INIT_FCS) {
       _u16Crc = u16Init;
    }
 
@@ -39,10 +42,10 @@ public:
     * @param pBuffer    Pointer to the buffer
     * @param u16Size    Size of the buffer in bytes
     */
-   inline void calc(const uint8_t *pBuffer, uint16_t u16Size) {
-      while (u16Size > 0U) {
+   inline void calc(const uint8_t *pBuffer, int size) {
+      while (size > 0) {
          calc(*(pBuffer++));
-         u16Size--;
+         size--;
       }
    }
 
@@ -51,7 +54,7 @@ public:
     * @return Current CRC
     */
    inline uint16_t getCrc() {
-      return ((_u16Crc & 0xff) << 8 | ((_u16Crc & 0xff00) >> 8)) ^ u16InitFcs;
+      return ((_u16Crc & LO_BYTE_MASK) << 8 | ((_u16Crc & HI_BYTE_MASK) >> 8)) ^ INIT_FCS;
    }
 
 private:

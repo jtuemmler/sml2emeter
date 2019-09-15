@@ -173,7 +173,7 @@ void ledOff() {
    digitalWrite(LED_BUILTIN, HIGH);
 }
 
-void delayMs(int delayMs) {
+void delayMs(unsigned long delayMs) {
    unsigned long start = millis();
    while (millis() - start < delayMs) {
       iotWebConf.doLoop();

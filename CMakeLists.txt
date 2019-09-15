@@ -27,6 +27,8 @@ add_executable(sml2emeter
    util/IotWebConf.h
 )
 
+target_compile_options(sml2emeter PRIVATE -Wall -Wextra -pedantic -Wno-unused-parameter)
+
 add_executable(smlparser
    smlparser.h
    crc16ccitt.h

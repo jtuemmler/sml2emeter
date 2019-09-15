@@ -83,7 +83,7 @@ public:
    void setWifiConnectionFailedHandler( std::function<IotWebConfWifiAuthInfo*()> func ) {}
    bool addParameter(IotWebConfParameter* parameter) { return true; }
    const char* getThingName() { return "Thing"; }
-   void delay(unsigned long millis) { delay(millis); }
+   void delay(unsigned long millis) { ::delay(millis); }
    void setWifiConnectionTimeoutMs(unsigned long millis) {}
    void blink(unsigned long repeatMs, byte dutyCyclePercent) {}
    void fineBlink(unsigned long onMs, unsigned long offMs) {}

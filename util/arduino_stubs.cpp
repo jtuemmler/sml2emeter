@@ -20,7 +20,7 @@
 #  include <mach/mach.h>
 #endif
 
-void delay(int duration) {
+void delay(unsigned long duration) {
 #if _WIN32
    Sleep(duration);
 #else
@@ -28,7 +28,7 @@ void delay(int duration) {
 #endif
 }
 
-int millis() {
+unsigned long millis() {
 #if _WIN32
    return GetTickCount();
 #elif __MACH__
@@ -37,11 +37,11 @@ int millis() {
    host_get_clock_service(mach_host_self(), CALENDAR_CLOCK, &cclock);
    clock_get_time(cclock, &mts);
    mach_port_deallocate(mach_task_self(), cclock);
-   return (int)((mts.tv_sec * 1000UL) + (mts.tv_nsec / 1000000UL));
+   return (mts.tv_sec * 1000UL) + (mts.tv_nsec / 1000000UL);
 #else
    struct timespec tv;
    clock_gettime(CLOCK_MONOTONIC, &tv);
-   return (int)((tv.tv_sec * 1000UL) + (tv.tv_nsec / 1000000UL));
+   return (tv.tv_sec * 1000UL) + (tv.tv_nsec / 1000000UL);
 #endif
 }
 
