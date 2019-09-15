@@ -26,10 +26,16 @@
 // Application version
 const char VERSION[] = "Version 1.2";
 
+// Timeout for reading SML packets
+const int SERIAL_TIMEOUT_MS = 100;
+
 // Use demo data
 //  Set to false, to read data from serial port or to
 //  true: Use build-in demo data
 const bool USE_DEMO_DATA = false;
+
+// Time to wait for demo-data
+const int TEST_PACKET_RECEIVE_TIME_MS = SERIAL_TIMEOUT_MS + SML_TEST_PACKET_LENGTH / 12;
 
 // ----------------------------------------------------------------------------
 // SMA energy meter constants
@@ -88,12 +94,7 @@ const char CONFIG_VERSION[] = "v1";
 //   password to buld an AP. (E.g. in case of lost password)
 const int CONFIG_PIN = D2;
 
-// Status indicator pin.
-//      First it will light up (kept LOW), on Wifi connection it will blink,
-//      when connected to the Wifi it will turn off (kept HIGH).
-const int STATUS_PIN = LED_BUILTIN;
-
-const char INDEX_HTML[] = "<!doctype html><title>SML 2 EMeter</title><script>function u(n,t){var r=new XMLHttpRequest;r.onreadystatechange=function(){if(4==r.readyState&&200==r.status){var t=JSON.parse(r.responseText),e=\"\";for(var a in t)e=e.concat(\"<tr><td>{k}</td><td>{v}</td></tr>\".replace(\"{k}\",a).replace(\"{v}\",t[a]));document.getElementById(n).innerHTML=\"<table border><tr><th>Name</th><th>Value</th></tr>{d}</table>\".replace(\"{d}\",e)}},r.open(\"GET\",t,!0),r.send()}function r(){u(\"data\",\"data\")}function i(){r();self.setInterval(function(){r()},5e3)}</script><style>table{width:95%}th{background-color:#666;color:#fff}tr{background-color:#fffbf0;color:#000}tr:nth-child(odd){background-color:#e4ebf2}</style><body onload=i()><p>Current readings:<div id=data> </div><p>Change <a href=config>settings</a>.<p>{v}";
+const char INDEX_HTML[] = "<!doctype html><title>SML 2 EMeter</title><script>function u(n,t){var r=new XMLHttpRequest;r.onreadystatechange=function(){if(4==r.readyState&&200==r.status){var t=JSON.parse(r.responseText),e=\"\";for(var a in t)e=e.concat(\"<tr><td>{k}</td><td>{v}</td></tr>\".replace(\"{k}\",a).replace(\"{v}\",t[a]));document.getElementById(n).innerHTML=\"<table border><tr><th>Name</th><th>Value</th></tr>{d}</table>\".replace(\"{d}\",e)}},r.open(\"GET\",t,!0),r.send()}function r(){u(\"data\",\"data\")}function i(){r();self.setInterval(function(){r()},2e3)}</script><style>table{width:95%}th{background-color:#666;color:#fff}tr{background-color:#fffbf0;color:#000}tr:nth-child(odd){background-color:#e4ebf2}</style><body onload=i()><p>Current readings:<div id=data> </div><p>Change <a href=config>settings</a>.<p>{v}";
 
 // ----------------------------------------------------------------------------
 // Global variables
@@ -120,6 +121,8 @@ uint8_t *pMeterTime;
 SmlParser smlParser;
 
 uint32_t readErrors = 0;
+
+int failedWifiConnections = 0;
 
 // Destination addresses for sending meter packets
 const int DEST_ADRESSES_SIZE = 2;
@@ -170,17 +173,24 @@ void ledOff() {
    digitalWrite(LED_BUILTIN, HIGH);
 }
 
+void delayMs(int delayMs) {
+   unsigned long start = millis();
+   while (millis() - start < delayMs) {
+      iotWebConf.doLoop();
+      delay(1); 
+   }
+}
 /**
 * @brief Blink function for status feedback
 */
 void blink(int count, int onDuration, int offDuration, int delayAfter) {
    for (int i = 0; i < count; i++) {
       ledOn();
-      delay(onDuration);
+      delayMs(onDuration);
       ledOff();
-      delay(offDuration);
+      delayMs(offDuration);
    }
-   delay(delayAfter);
+   delayMs(delayAfter);
 }
 
 /**
@@ -297,15 +307,14 @@ int readSerial() {
          ++readErrors;
       }
       else {
-         iotWebConf.doLoop();
-         delay(5);
+         delayMs(5);
       }
    }
 
    // We got some bytes. Read until next pause
    Serial.print("R");
    ledOn();
-   Serial.setTimeout(200);
+   Serial.setTimeout(SERIAL_TIMEOUT_MS);
    int serialLen = Serial.readBytes(smlPacket, SML_PACKET_SIZE);
    ledOff();
    return serialLen;
@@ -315,14 +324,13 @@ int readSerial() {
 * @brief Read test packet
 */
 int readTestPacket() {
-    Serial.print("W");
-    for (int i = 0; i < 500; i += 5) {
-      iotWebConf.doLoop();
-      delay(5);
+    Serial.print("w");
+    for (int i = 0; i < 1000 - TEST_PACKET_RECEIVE_TIME_MS; i += 5) {
+      delayMs(5);
     }
-    Serial.print("R");
+    Serial.print("r");
     ledOn();    
-    delay(500);
+    delay(TEST_PACKET_RECEIVE_TIME_MS);
     memcpy(smlPacket, SML_TEST_PACKET, SML_TEST_PACKET_LENGTH);
     ledOff();
     return SML_TEST_PACKET_LENGTH;
@@ -333,80 +341,96 @@ int readTestPacket() {
  */
 void handleRoot()
 {
-   // Let IotWebConf test and handle captive portal requests.
-   if (iotWebConf.handleCaptivePortal()) {
-      // Captive portal request were already served.
-      return;
-   }
+    // Let IotWebConf test and handle captive portal requests.
+    if (iotWebConf.handleCaptivePortal()) {
+        // Captive portal request were already served.
+        return;
+    }
 
-   String page = INDEX_HTML;
-   page.replace("{v}",VERSION);
-   server.send(200, "text/html", page);
+    String page = INDEX_HTML;
+    page.replace("{v}",VERSION);
+    server.send(200, "text/html", page);
 }
 
+/**
+ * @brief Return the current readings as json object
+ */
 void handleData() {
-   String data = "{";
-   data += "\"PowerIn\" : ";
-   data += smlParser.getPowerInW() / 100.0;
-   data += ",\"EnergyIn\" : ";
-   data += smlParser.getEnergyInWh() / 100.0;
-   data += ",\"PowerOut\" : ";
-   data += smlParser.getPowerOutW() / 100.0;
-   data += ",\"EnergyOut\" : ";
-   data += smlParser.getEnergyOutWh() / 100.0;
-   data += ",\"Ok\" : ";
-   data += (unsigned int)smlParser.getParsedOk();
-   data += ",\"Errors\" : ";
-   data += (unsigned int)smlParser.getParseErrors() + readErrors;
-   data += "}";
+    String data = "{";
+    data += "\"PowerIn\" : ";
+    data += smlParser.getPowerInW() / 100.0;
+    data += ",\"EnergyIn\" : ";
+    data += smlParser.getEnergyInWh() / 100.0;
+    data += ",\"PowerOut\" : ";
+    data += smlParser.getPowerOutW() / 100.0;
+    data += ",\"EnergyOut\" : ";
+    data += smlParser.getEnergyOutWh() / 100.0;
+    data += ",\"Ok\" : ";
+    data += (unsigned int)smlParser.getParsedOk();
+    data += ",\"Errors\" : ";
+    data += (unsigned int)smlParser.getParseErrors() + readErrors;
+    data += "}";
 
-   server.send(200, "application/json", data);
+    server.send(200, "application/json", data);
 }
+
 /**
  * @brief Check, whether a valid IP address is given
  */
 bool checkIp(IotWebConfParameter &parameter) {
-  IPAddress ip;
+   IPAddress ip;
 
-  String arg = server.arg(parameter.getId());
-  if (arg.length() > 0) {
-    if (!ip.fromString(arg)) {
-      parameter.errorMessage = "IP address is not valid!";
-      return false;
-    }
-  }
-  return true;
+   String arg = server.arg(parameter.getId());
+   if (arg.length() > 0) {
+      if (!ip.fromString(arg)) {
+         parameter.errorMessage = "IP address is not valid!";
+         return false;
+      }
+   }
+   return true;
 }
 
 /**
  * @brief Validate input in the form
  */
 bool formValidator() {
-  Serial.println("Validating form.");
-  bool valid = checkIp(destinationAddress1Param) && checkIp(destinationAddress2Param);
+   Serial.println("Validating form.");
+   bool valid = checkIp(destinationAddress1Param) && checkIp(destinationAddress2Param);
 
-  return valid;
+   return valid;
 }
 
 /**
  * @brief Process changed configuration
  */
 void configSaved() {
-  Serial.println("Configuration was updated.");
-  port = atoi(portValue);
-  numDestAddresses = 0;
-  if (destAddresses[numDestAddresses].fromString(destinationAddress1Value)) {
-    ++numDestAddresses;
-  }
-  if (destAddresses[numDestAddresses].fromString(destinationAddress2Value)) {
-    ++numDestAddresses;
-  }
+   Serial.println("Configuration was updated.");
+   port = atoi(portValue);
+   numDestAddresses = 0;
+   if (destAddresses[numDestAddresses].fromString(destinationAddress1Value)) {
+     ++numDestAddresses;
+   }
+   if (destAddresses[numDestAddresses].fromString(destinationAddress2Value)) {
+     ++numDestAddresses;
+   }
 
-  Serial.print("serNo: "); Serial.println(serialNumberValue);
-  Serial.print("port: "); Serial.println(port);
-  Serial.print("numDestAddresses: "); Serial.println(numDestAddresses);
+   Serial.print("serNo: "); Serial.println(serialNumberValue);
+   Serial.print("port: "); Serial.println(port);
+   Serial.print("numDestAddresses: "); Serial.println(numDestAddresses);
 
-  initEmeterPacket(atoi(serialNumberValue));
+   initEmeterPacket(atoi(serialNumberValue));
+}
+
+/**
+ * Handle faild wifi-connections.
+ */
+IotWebConfWifiAuthInfo* handleWifiConnectionFailed() {
+   ++failedWifiConnections;
+   if (failedWifiConnections >= 2) {
+      Serial.println("Failed to init WiFi ... restart!");
+      ESP.restart();
+   }
+   return NULL;
 }
 
 /**
@@ -415,9 +439,8 @@ void configSaved() {
 void setup() {
    // Initialize the LED_BUILTIN pin as an output
    pinMode(LED_BUILTIN, OUTPUT);
-   // Signal startup
-   blink(1, 5000, 500, 1000); 
-   
+   ledOff();
+  
    // Open serial communications and wait for port to open      
    Serial.begin(9600);
    while (!Serial);
@@ -432,9 +455,6 @@ void setup() {
    Serial.print("MAC address: ");
    Serial.println(WiFi.macAddress());
 
-   // Signal Serial OK
-   blink(2, 100, 500, 2000);   
-
    itoa(990000000 + ESP.getChipId(), serialNumberValue, 10);
    itoa(DESTINATION_PORT, portValue, 10);
    
@@ -448,6 +468,7 @@ void setup() {
    iotWebConf.setFormValidator(&formValidator);
    iotWebConf.setupUpdateServer(&httpUpdater,"/update");
    iotWebConf.getApTimeoutParameter()->visible = false;
+   iotWebConf.setWifiConnectionFailedHandler([]() { return handleWifiConnectionFailed(); });
 
    // Initializing the configuration.
    iotWebConf.init();
@@ -460,6 +481,7 @@ void setup() {
    server.onNotFound([]() { iotWebConf.handleNotFound(); });
 
    Serial.println("Initialization done.");
+   blink(3, 500, 250, 0);
 }
 
 /**
@@ -467,10 +489,13 @@ void setup() {
 */
 void loop() {
    // Do not process meter data, if we are not connected at all.
-   if ((iotWebConf.getState() != IOTWEBCONF_STATE_ONLINE) || (port == 0)) {
+   if (iotWebConf.getState() != IOTWEBCONF_STATE_ONLINE) {
+      ledOn();
       iotWebConf.doLoop();
       return;
    }
+   ledOff();
+   failedWifiConnections = 0;
    
    Serial.print("_");
 
@@ -486,28 +511,30 @@ void loop() {
    // Send the packet if a valid telegram was received
    if (smlPacketLength <= SML_PACKET_SIZE) {
       if (smlParser.parsePacket(smlPacket, smlPacketLength)) {
-         int meterPacketLength = updateEmeterPacket();
-         int i = 0;
-         do {
-            Serial.print("S");
-            if (numDestAddresses == 0) {
-               Udp.beginPacketMulticast(MCAST_ADDRESS, port, WiFi.localIP(), 1);
-            }
-            else {
-               Udp.beginPacket(destAddresses[i], port);
-            }
+         if (port > 0) {
+            int meterPacketLength = updateEmeterPacket();
+            int i = 0;
+            do {
+               Serial.print("S");
+               if (numDestAddresses == 0) {
+                  Udp.beginPacketMulticast(MCAST_ADDRESS, port, WiFi.localIP(), 1);
+               }
+               else {
+                  Udp.beginPacket(destAddresses[i], port);
+               }
 
-            if (port == DESTINATION_PORT) {
-               Udp.write(meterPacket, meterPacketLength);
-            }
-            else {
-               Udp.write(smlPacket, smlPacketLength);
-            }
+               if (port == DESTINATION_PORT) {
+                  Udp.write(meterPacket, meterPacketLength);
+               }
+               else {
+                  Udp.write(smlPacket, smlPacketLength);
+               }
 
-            // Send paket
-            Udp.endPacket();
-            ++i;
-         } while (i < numDestAddresses);
+               // Send paket
+               Udp.endPacket();
+               ++i;
+            } while (i < numDestAddresses);
+         }
       }
       else {
          Serial.print("E");
