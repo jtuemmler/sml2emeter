@@ -17,7 +17,7 @@
 #include <ESP8266WiFi.h>
 #include <WiFiUDP.h>
 #include "util/sml_testpacket.h"
-#include "util/smlparser.h"
+#include "smlparser.h"
 
 // ----------------------------------------------------------------------------
 // Compile time settings

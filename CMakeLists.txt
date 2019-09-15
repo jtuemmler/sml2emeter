@@ -15,6 +15,8 @@ add_executable(smlprinter
 
 add_executable(sml2emeter
    sml2emeter.ino
+   smlparser.h
+   crc16ccitt.h
    util/main.cpp
    util/sml_testpacket.h
    util/arduino_stubs.h
@@ -23,13 +25,12 @@ add_executable(sml2emeter
    util/WiFiUDP.cpp
    util/ESP8266WiFi.h
    util/IotWebConf.h
-   util/crc16ccitt.h
 )
 
 add_executable(smlparser
+   smlparser.h
+   crc16ccitt.h
    util/smlparsertest.cpp
-   util/crc16ccitt.h
-   util/smlparser.h
    util/sml_testpacket.h
 )
 
