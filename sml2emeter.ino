@@ -94,7 +94,24 @@ const char CONFIG_VERSION[] = "v1";
 //   password to buld an AP. (E.g. in case of lost password)
 const int CONFIG_PIN = D2;
 
-const char INDEX_HTML[] = "<!doctype html><title>SML 2 EMeter</title><script>function u(n,t){var r=new XMLHttpRequest;r.onreadystatechange=function(){if(4==r.readyState&&200==r.status){var t=JSON.parse(r.responseText),e=\"\";for(var a in t)e=e.concat(\"<tr><td>{k}</td><td>{v}</td></tr>\".replace(\"{k}\",a).replace(\"{v}\",t[a]));document.getElementById(n).innerHTML=\"<table border><tr><th>Name</th><th>Value</th></tr>{d}</table>\".replace(\"{d}\",e)}},r.open(\"GET\",t,!0),r.send()}function r(){u(\"data\",\"data\")}function i(){r();self.setInterval(function(){r()},2e3)}</script><style>table{width:95%}th{background-color:#666;color:#fff}tr{background-color:#fffbf0;color:#000}tr:nth-child(odd){background-color:#e4ebf2}</style><body onload=i()><p>Current readings:<div id=data> </div><p>Change <a href=config>settings</a>.<p>{v}";
+const char INDEX_HTML[] = 
+  "<!doctypehtml><meta charset=utf-8><meta content=\"width=device-width,initial-scale"
+  "=1,user-scalable=no\"name=viewport><title>Energy meter</title><script>function u(a"
+  ",t){var r=new XMLHttpRequest;r.onreadystatechange=function(){if(4==r.readyState&&2"
+  "00==r.status){var t=JSON.parse(r.responseText),e=\"\";for(var n in t)e=e.concat(\""
+  "<tr><th>{k}</th><td>{v}</td></tr>\".replace(\"{k}\",n).replace(\"{v}\",t[n]));docu"
+  "ment.getElementById(a).innerHTML='<table style=\"width:100%\">{d}</table>'.replace"
+  "(\"{d}\",e)}},r.open(\"GET\",t,!0),r.send()}function r(){u(\"data\",\"data\")}func"
+  "tion i(){r();self.setInterval(function(){r()},2e3)}window.onload=i()</script><styl"
+  "e>div{padding:5px;font-size:1em}p{margin:.5em 0}body{text-align:center;font-family"
+  ":verdana}td{padding:0}th{padding:5px;width:50%}td{padding:5px;width:50%}button{bor"
+  "der:0;border-radius:.3rem;background-color:#1fa3ec;color:#fff;line-height:2.4rem;f"
+  "ont-size:1.2rem;width:100%;-webkit-transition-duration:.4s;transition-duration:.4s"
+  ";cursor:pointer}button:hover{background-color:#0e70a4}</style><div style=text-alig"
+  "n:left;display:inline-block;min-width:340px><div style=text-align:center><noscript"
+  ">Please enable JavaScript<br></noscript><h2>Energy meter</h2></div><div id=data> <"
+  "/div><p><form action=config><button>Configuration</button></form><div style=text-a"
+  "lign:right;font-size:11px><hr>{v}</div></div>";
 
 // ----------------------------------------------------------------------------
 // Global variables
@@ -357,6 +374,7 @@ void handleRoot()
  */
 void handleData() {
     String data = "{";
+    if (smlParser.getParsedOk() > 0) {
     data += "\"PowerIn\" : ";
     data += smlParser.getPowerInW() / 100.0;
     data += ",\"EnergyIn\" : ";
@@ -369,6 +387,7 @@ void handleData() {
     data += (unsigned int)smlParser.getParsedOk();
     data += ",\"Errors\" : ";
     data += (unsigned int)smlParser.getParseErrors() + readErrors;
+    }
     data += "}";
 
     server.send(200, "application/json", data);
