@@ -18,6 +18,7 @@
 #include <WiFiUDP.h>
 #include "util/sml_testpacket.h"
 #include "smlparser.h"
+#include "emeterpacket.h"
 
 // ----------------------------------------------------------------------------
 // Compile time settings
@@ -36,37 +37,6 @@ const bool USE_DEMO_DATA = false;
 
 // Time to wait for demo-data
 const int TEST_PACKET_RECEIVE_TIME_MS = SERIAL_TIMEOUT_MS + SML_TEST_PACKET_LENGTH / 12;
-
-// ----------------------------------------------------------------------------
-// SMA energy meter constants
-//
-// For details see:
-// https://www.sma.de/fileadmin/content/global/Partner/Documents/SMA_Labs/EMETER-Protokoll-TI-de-10.pdf
-// ----------------------------------------------------------------------------
-
-// IDs to identify values in the energy meter packets
-const uint32_t SMA_POSITIVE_ACTIVE_POWER = 0x00010400;
-const uint32_t SMA_POSITIVE_REACTIVE_POWER = 0x00030400;
-const uint32_t SMA_NEGATIVE_ACTIVE_POWER = 0x00020400;
-const uint32_t SMA_NEGATIVE_REACTIVE_POWER = 0x00040400;
-const uint32_t SMA_POSITIVE_ENERGY = 0x00010800;
-const uint32_t SMA_NEGATIVE_ENERGY = 0x00020800;
-const uint32_t SMA_VERSION = 0x90000000;
-
-// IDs to identify offsets in the SMA meter header
-const uint8_t WLEN = 0xfa;
-const uint8_t DSRC = 0xfb;
-const uint8_t DTIM = 0xfc;
-
-// Protocol-header for SMA energy meter packet
-const uint8_t SMA_METER_HEADER[] = { 'S', 'M', 'A', 0,                         // Identifier
-                             0x00, 0x04, 0x02, 0xa0, 0x00, 0x00, 0x00, 0x01,   // Group 1
-                             WLEN, WLEN, 0x00, 0x10, 0x60, 0x69,               // Start of protocol 0x6069
-                             0x01, 0x0e, DSRC, DSRC, DSRC, DSRC,               // Source address
-                             DTIM, DTIM, DTIM, DTIM };                         // Timestamp
-
-// Initial length of the payload (Protocol-ID + SRC + Time)
-const int INITIAL_PAYLOAD_LENGTH = 12;
 
 // Default multicast address for energy meter packets
 const IPAddress MCAST_ADDRESS = IPAddress(239, 12, 255, 254);
@@ -94,24 +64,8 @@ const char CONFIG_VERSION[] = "v1";
 //   password to buld an AP. (E.g. in case of lost password)
 const int CONFIG_PIN = D2;
 
-const char INDEX_HTML[] = 
-  "<!doctypehtml><meta charset=utf-8><meta content=\"width=device-width,initial-scale"
-  "=1,user-scalable=no\"name=viewport><title>Energy meter</title><script>function u(a"
-  ",t){var r=new XMLHttpRequest;r.onreadystatechange=function(){if(4==r.readyState&&2"
-  "00==r.status){var t=JSON.parse(r.responseText),e=\"\";for(var n in t)e=e.concat(\""
-  "<tr><th>{k}</th><td>{v}</td></tr>\".replace(\"{k}\",n).replace(\"{v}\",t[n]));docu"
-  "ment.getElementById(a).innerHTML='<table style=\"width:100%\">{d}</table>'.replace"
-  "(\"{d}\",e)}},r.open(\"GET\",t,!0),r.send()}function r(){u(\"data\",\"data\")}func"
-  "tion i(){r();self.setInterval(function(){r()},2e3)}window.onload=i()</script><styl"
-  "e>div{padding:5px;font-size:1em}p{margin:.5em 0}body{text-align:center;font-family"
-  ":verdana}td{padding:0}th{padding:5px;width:50%}td{padding:5px;width:50%}button{bor"
-  "der:0;border-radius:.3rem;background-color:#1fa3ec;color:#fff;line-height:2.4rem;f"
-  "ont-size:1.2rem;width:100%;-webkit-transition-duration:.4s;transition-duration:.4s"
-  ";cursor:pointer}button:hover{background-color:#0e70a4}</style><div style=text-alig"
-  "n:left;display:inline-block;min-width:340px><div style=text-align:center><noscript"
-  ">Please enable JavaScript<br></noscript><h2>Energy meter</h2></div><div id=data> <"
-  "/div><p><form action=config><button>Configuration</button></form><div style=text-a"
-  "lign:right;font-size:11px><hr>{v}</div></div>";
+// Static part of the web-page
+const char INDEX_HTML[] = "<!doctypehtml><meta charset=utf-8><meta content=\"width=device-width,initial-scale=1,user-scalable=no\"name=viewport><title>Energy meter</title><script>function u(a,t){var r=new XMLHttpRequest;r.onreadystatechange=function(){if(4==r.readyState&&200==r.status){var t=JSON.parse(r.responseText),e=\"\";for(var n in t)e=e.concat(\"<tr><th>{k}</th><td>{v}</td></tr>\".replace(\"{k}\",n).replace(\"{v}\",t[n]));document.getElementById(a).innerHTML='<table style=\"width:100%\">{d}</table>'.replace(\"{d}\",e)}},r.open(\"GET\",t,!0),r.send()}function r(){u(\"data\",\"data\")}function i(){r();self.setInterval(function(){r()},2e3)}window.onload=i()</script><style>div{padding:5px;font-size:1em}p{margin:.5em 0}body{text-align:center;font-family:verdana}td{padding:0}th{padding:5px;width:50%}td{padding:5px;width:50%}button{border:0;border-radius:.3rem;background-color:#1fa3ec;color:#fff;line-height:2.4rem;font-size:1.2rem;width:100%;-webkit-transition-duration:.4s;transition-duration:.4s;cursor:pointer}button:hover{background-color:#0e70a4}</style><div style=text-align:left;display:inline-block;min-width:340px><div style=text-align:center><noscript>Please enable JavaScript<br></noscript><h2>Energy meter</h2></div><div id=data> </div><p><form action=config><button>Configuration</button></form><div style=text-align:right;font-size:11px><hr>{v}</div></div>";
 
 // ----------------------------------------------------------------------------
 // Global variables
@@ -121,21 +75,11 @@ const char INDEX_HTML[] =
 const int SML_PACKET_SIZE = 1000;
 uint8_t smlPacket[SML_PACKET_SIZE];
 
-// Buffer to store the energy-meter packet
-const int METER_PACKET_SIZE = 1000;
-uint8_t meterPacket[METER_PACKET_SIZE];
-
-// Length of the energy meter packet header
-uint16_t meterHeaderLength;
-
-// Pointer to the data-length field in the energy meter packet
-uint8_t *pMeterDataSize;
-
-// Pointer to the time field in the energy meter packet
-uint8_t *pMeterTime;
-
 // Parser for SML packets
 SmlParser smlParser;
+
+// Class for generating e-meter packets
+EmeterPacket emeterPacket;
 
 // Errors while reading packets from the serial interface
 uint32_t readErrors = 0;
@@ -239,99 +183,22 @@ void delayMs(unsigned long delayMs) {
 }
 
 /**
-* @brief Store an U16 in big endian byte order
-*/
-uint8_t *storeU16BE(uint8_t *pPos, uint16_t value) {
-   *(pPos++) = value >> 8;
-   *(pPos++) = value & 0xff;
-   return pPos;
-}
-
-/**
-* @brief Store an U32 in big endian byte order
-*/
-uint8_t *storeU32BE(uint8_t *pPos, uint32_t value) {
-   pPos = storeU16BE(pPos, value >> 16);
-   return storeU16BE(pPos, value & 0xffff);
-}
-
-/**
-* @brief Store an U64 in big endian byte order
-*/
-uint8_t *storeU64BE(uint8_t *pPos, uint64_t value) {
-   pPos = storeU32BE(pPos, value >> 32);
-   return storeU32BE(pPos, value & 0xffffffff);
-}
-
-/**
-* @brief Find the offset of the given identifier
-*/
-uint8_t* offsetOf(uint8_t *pData, uint8_t identifier, int size) {
-   for (int i = 0; i < size; ++i) {
-      if (pData[i] == identifier) {
-         return pData + i;
-      }
-   }
-   Serial.print("Error: could not find offset: ");
-   Serial.println(identifier);
-   return 0;
-}
-
-/**
-* @brief Initialize energy meter packet
-*/
-void initEmeterPacket(uint32_t serNo) {
-   meterHeaderLength = sizeof(SMA_METER_HEADER);
-   memcpy(meterPacket, SMA_METER_HEADER, meterHeaderLength);
-
-   pMeterDataSize = offsetOf(meterPacket, WLEN, meterHeaderLength);
-   pMeterTime = offsetOf(meterPacket, DTIM, meterHeaderLength);
-
-   uint8_t *pSerNo = offsetOf(meterPacket, DSRC, meterHeaderLength);
-   storeU32BE(pSerNo, serNo);
-}
-
-/**
 * @brief Update the energy meter packet
 */
-uint16_t updateEmeterPacket() {
-   uint8_t *pPacketPos = meterPacket + meterHeaderLength;
-   storeU32BE(pMeterTime, millis());
-
-   // Initial length of packet (ID + SN + TS)
-   uint16_t length = INITIAL_PAYLOAD_LENGTH;
+void updateEmeterPacket() {
+   emeterPacket.begin(millis());
 
    // Store active and reactive power (convert from centi-W to deci-W)
-   pPacketPos = storeU32BE(pPacketPos, SMA_POSITIVE_ACTIVE_POWER);
-   pPacketPos = storeU32BE(pPacketPos, smlParser.getPowerInW() / 10);
-   pPacketPos = storeU32BE(pPacketPos, SMA_NEGATIVE_ACTIVE_POWER);
-   pPacketPos = storeU32BE(pPacketPos, smlParser.getPowerOutW() / 10);
-   pPacketPos = storeU32BE(pPacketPos, SMA_POSITIVE_REACTIVE_POWER);
-   pPacketPos = storeU32BE(pPacketPos, 0);
-   pPacketPos = storeU32BE(pPacketPos, SMA_NEGATIVE_REACTIVE_POWER);
-   pPacketPos = storeU32BE(pPacketPos, 0);
-   length += 32;
+   emeterPacket.addMeasurementValue(EmeterPacket::SMA_POSITIVE_ACTIVE_POWER, smlParser.getPowerInW() / 10);
+   emeterPacket.addMeasurementValue(EmeterPacket::SMA_NEGATIVE_ACTIVE_POWER, smlParser.getPowerOutW() / 10);
+   emeterPacket.addMeasurementValue(EmeterPacket::SMA_POSITIVE_REACTIVE_POWER, 0);
+   emeterPacket.addMeasurementValue(EmeterPacket::SMA_NEGATIVE_REACTIVE_POWER, 0);
 
    // Store energy (convert from centi-Wh to Ws)
-   pPacketPos = storeU32BE(pPacketPos, SMA_POSITIVE_ENERGY);
-   pPacketPos = storeU64BE(pPacketPos, smlParser.getEnergyInWh() * 36UL);
-   pPacketPos = storeU32BE(pPacketPos, SMA_NEGATIVE_ENERGY);
-   pPacketPos = storeU64BE(pPacketPos, smlParser.getEnergyOutWh() * 36UL);
-   length += 24;
+   emeterPacket.addCounterValue(EmeterPacket::SMA_POSITIVE_ENERGY, smlParser.getEnergyInWh() * 36UL);
+   emeterPacket.addCounterValue(EmeterPacket::SMA_NEGATIVE_ENERGY, smlParser.getEnergyOutWh() * 36UL);
 
-   // Store version
-   pPacketPos = storeU32BE(pPacketPos, SMA_VERSION);
-   pPacketPos = storeU32BE(pPacketPos, 0x01020452);
-   length += 8;
-
-   // Update length
-   storeU16BE(pMeterDataSize, length);
-
-   // Add end-tag
-   storeU32BE(pPacketPos, 0);
-   length += 4;
-
-   return meterHeaderLength + length - INITIAL_PAYLOAD_LENGTH;
+   emeterPacket.end();
 }
 
 /**
@@ -411,11 +278,12 @@ void handleData() {
        data += smlParser.getPowerOutW() / 100.0;
        data += ",\"EnergyOut\" : ";
        data += smlParser.getEnergyOutWh() / 100.0;
-       data += ",\"Ok\" : ";
-       data += (unsigned int)smlParser.getParsedOk();
-       data += ",\"Errors\" : ";
-       data += (unsigned int)smlParser.getParseErrors() + readErrors;
+       data += ",";
     }
+    data += "\"Ok\" : ";
+    data += (unsigned int)smlParser.getParsedOk();
+    data += ",\"Errors\" : ";
+    data += (unsigned int)smlParser.getParseErrors() + readErrors;
     data += "}";
 
     server.send(200, "application/json", data);
@@ -465,7 +333,7 @@ void configSaved() {
    Serial.print("port: "); Serial.println(port);
    Serial.print("numDestAddresses: "); Serial.println(numDestAddresses);
 
-   initEmeterPacket(atoi(serialNumberValue));
+   emeterPacket.init(atoi(serialNumberValue));
 }
 
 /**
@@ -515,7 +383,7 @@ void setup() {
    iotWebConf.setupUpdateServer(&httpUpdater,"/update");
    iotWebConf.getApTimeoutParameter()->visible = false;
    iotWebConf.setWifiConnectionFailedHandler([]() { return handleWifiConnectionFailed(); });
-
+   
    // Initializing the configuration.
    iotWebConf.init();
    configSaved();
@@ -548,7 +416,7 @@ void loop() {
    if (smlPacketLength <= SML_PACKET_SIZE) {
       if (smlParser.parsePacket(smlPacket, smlPacketLength)) {
          if (port > 0) {
-            int meterPacketLength = updateEmeterPacket();
+            updateEmeterPacket();
             int i = 0;
             do {
                Serial.print("S");
@@ -560,7 +428,7 @@ void loop() {
                }
 
                if (port == DESTINATION_PORT) {
-                  Udp.write(meterPacket, meterPacketLength);
+                  Udp.write(emeterPacket.getData(), emeterPacket.getLength());
                }
                else {
                   Udp.write(smlPacket, smlPacketLength);

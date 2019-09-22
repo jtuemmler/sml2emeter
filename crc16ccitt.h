@@ -1,5 +1,5 @@
-#ifndef _CRC16_CCITT
-#define _CRC16_CCITT
+#ifndef CRC16_CCITT_H
+#define CRC16_CCITT_H
 
 #include "inttypes.h"
 
@@ -104,4 +104,4 @@ const uint16_t Crc16Ccitt::_crcTable[Crc16Ccitt::_u16CrcTableSize] = {
       0x7bc7U, 0x6a4eU, 0x58d5U, 0x495cU, 0x3de3U, 0x2c6aU, 0x1ef1U, 0x0f78U
 };
 
-#endif
+#endif // CRC16_CCITT_H

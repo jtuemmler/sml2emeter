@@ -17,6 +17,7 @@ add_executable(sml2emeter
    sml2emeter.ino
    smlparser.h
    crc16ccitt.h
+   emeterpacket.h
    util/main.cpp
    util/sml_testpacket.h
    util/arduino_stubs.h
@@ -27,9 +28,11 @@ add_executable(sml2emeter
    util/IotWebConf.h
 )
 
-target_compile_options(sml2emeter PRIVATE -Wall -Wextra -pedantic -Wno-unused-parameter)
+if(NOT MSVC)
+   target_compile_options(sml2emeter PRIVATE -Wall -Wextra -pedantic -Wno-unused-parameter)
+endif(NOT MSVC)
 
-add_executable(smlparser
+add_executable(testsmlparser
    smlparser.h
    crc16ccitt.h
    util/smlparsertest.cpp
