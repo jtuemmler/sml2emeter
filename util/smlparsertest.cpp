@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <string.h>
+#include <initializer_list>
 #include "crc16ccitt.h"
 #include "smlparser.h"
 #include "sml_testpacket.h"
@@ -14,34 +15,34 @@ public:
    int run() {
       int failed = 0;
 
-      failed += testIntegerDecoding((uint8_t[]){ 0x51, 0xff }, 0);
-      failed += testIntegerDecoding((uint8_t[]){ 0x52, 0x00 }, 0);
-      failed += testIntegerDecoding((uint8_t[]){ 0x52, 0x10 }, 16);
-      failed += testIntegerDecoding((uint8_t[]){ 0x52, 0x80 }, -128);
-      failed += testIntegerDecoding((uint8_t[]){ 0x52, 0xff }, -1);
-      failed += testIntegerDecoding((uint8_t[]){ 0x52, 0xfe }, -2);
-      failed += testIntegerDecoding((uint8_t[]){ 0x53, 0xc8, 0x7a }, -14214);
-      failed += testIntegerDecoding((uint8_t[]){ 0x54, 0x00, 0x86, 0x08 }, 34312);
-      failed += testIntegerDecoding((uint8_t[]){ 0x54, 0x00, 0x86, 0x08 }, 34312);
-      failed += testIntegerDecoding((uint8_t[]){ 0x54, 0xff, 0x79, 0xf8 }, -34312);
-      failed += testIntegerDecoding((uint8_t[]){ 0x59, 0x7f, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff }, 9223372036854775807);
-      failed += testIntegerDecoding((uint8_t[]){ 0x59, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff }, -1);
+      failed += testIntegerDecoding(init({ 0x51, 0xff }), 0);
+      failed += testIntegerDecoding(init({ 0x52, 0x00 }), 0);
+      failed += testIntegerDecoding(init({ 0x52, 0x10 }), 16);
+      failed += testIntegerDecoding(init({ 0x52, 0x80 }), -128);
+      failed += testIntegerDecoding(init({ 0x52, 0xff }), -1);
+      failed += testIntegerDecoding(init({ 0x52, 0xfe }), -2);
+      failed += testIntegerDecoding(init({ 0x53, 0xc8, 0x7a }), -14214);
+      failed += testIntegerDecoding(init({ 0x54, 0x00, 0x86, 0x08 }), 34312);
+      failed += testIntegerDecoding(init({ 0x54, 0x00, 0x86, 0x08 }), 34312);
+      failed += testIntegerDecoding(init({ 0x54, 0xff, 0x79, 0xf8 }), -34312);
+      failed += testIntegerDecoding(init({ 0x59, 0x7f, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff }), 9223372036854775807);
+      failed += testIntegerDecoding(init({ 0x59, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff }), -1);
 
-      failed += testIntegerDecoding((uint8_t[]){ 0x61, 0xff }, 0);
-      failed += testIntegerDecoding((uint8_t[]){ 0x62, 0x00 }, 0);
-      failed += testIntegerDecoding((uint8_t[]){ 0x62, 0x10 }, 16);
-      failed += testIntegerDecoding((uint8_t[]){ 0x62, 0x80 }, 128);
-      failed += testIntegerDecoding((uint8_t[]){ 0x64, 0x00, 0x86, 0x08 }, 34312);
-      failed += testIntegerDecoding((uint8_t[]){ 0x64, 0x00, 0x86, 0x08 }, 34312);
-      failed += testIntegerDecoding((uint8_t[]){ 0x64, 0xff, 0x79, 0xf8 }, 16742904);
-      failed += testIntegerDecoding((uint8_t[]){ 0x69, 0x7f, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff }, 9223372036854775807);
-      failed += testIntegerDecoding((uint8_t[]){ 0x69, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff }, -1);
+      failed += testIntegerDecoding(init({ 0x61, 0xff }), 0);
+      failed += testIntegerDecoding(init({ 0x62, 0x00 }), 0);
+      failed += testIntegerDecoding(init({ 0x62, 0x10 }), 16);
+      failed += testIntegerDecoding(init({ 0x62, 0x80 }), 128);
+      failed += testIntegerDecoding(init({ 0x64, 0x00, 0x86, 0x08 }), 34312);
+      failed += testIntegerDecoding(init({ 0x64, 0x00, 0x86, 0x08 }), 34312);
+      failed += testIntegerDecoding(init({ 0x64, 0xff, 0x79, 0xf8 }), 16742904);
+      failed += testIntegerDecoding(init({ 0x69, 0x7f, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff }), 9223372036854775807);
+      failed += testIntegerDecoding(init({ 0x69, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff }), -1);
 
-      failed += testLengthDecoding((uint8_t[]){ 0x10 }, 0x0, 1, true);
-      failed += testLengthDecoding((uint8_t[]){ 0x15 }, 0x5, 1, true);
-      failed += testLengthDecoding((uint8_t[]){ 0x15 }, 0x5, 1, true);
-      failed += testLengthDecoding((uint8_t[]){ 0x81, 0x82, 0x83, 0x04 }, 0x1234, 4, true);
-      failed += testLengthDecoding((uint8_t[]){ 0x81, 0x82, 0x83, 0x04 }, 0x1234, 0, false);
+      failed += testLengthDecoding(init({ 0x10 }), 0x0, 1, true);
+      failed += testLengthDecoding(init({ 0x15 }), 0x5, 1, true);
+      failed += testLengthDecoding(init({ 0x15 }), 0x5, 1, true);
+      failed += testLengthDecoding(init({ 0x81, 0x82, 0x83, 0x04 }), 0x1234, 4, true);
+      failed += testLengthDecoding(init({ 0x81, 0x82, 0x83, 0x04 }), 0x1234, 0, false);
 
       return failed;
    }
@@ -53,7 +54,7 @@ public:
 
       int64_t value = getNextValue(pos);
 
-      printf("%s: Value expected %lld, got %lld\n",
+      printf("%s: Value expected %ld, got %ld\n",
              expected == value ? "OK" : "ERROR",
              expected, value);
 
@@ -74,6 +75,17 @@ public:
              expectedPos, pos);
 
       return testOk ? 0 : 1;
+   }
+
+private:
+   uint8_t _buffer[100];
+
+   const uint8_t* init(std::initializer_list<uint8_t> list) {
+      int count = 0;
+      for (auto v : list) {
+         _buffer[count++] = v;
+      }
+      return _buffer;
    }
 };
 
