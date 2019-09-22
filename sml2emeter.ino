@@ -137,9 +137,17 @@ uint8_t *pMeterTime;
 // Parser for SML packets
 SmlParser smlParser;
 
+// Errors while reading packets from the serial interface
 uint32_t readErrors = 0;
 
+// Counter for failed wifi connection attempts
 int failedWifiConnections = 0;
+
+// Current state of the led when in connection-mode
+bool ledState = false;
+
+// Time to change the state of the led
+unsigned long nextLedChange = 0;
 
 // Destination addresses for sending meter packets
 const int DEST_ADRESSES_SIZE = 2;
@@ -179,35 +187,55 @@ IotWebConfParameter portParam("Port","port",portValue,NUMBER_LEN,"number",portVa
 /**
 * @brief Turn status led on
 */
-void ledOn() {
-   digitalWrite(LED_BUILTIN, LOW);
+void ledOn(bool overrideComState = false) {
+   if ((iotWebConf.getState() == IOTWEBCONF_STATE_ONLINE) || overrideComState) {
+      digitalWrite(LED_BUILTIN, LOW);
+   }
 }
 
 /**
 * @brief Turn status led off
 */
-void ledOff() {
-   digitalWrite(LED_BUILTIN, HIGH);
+void ledOff(bool overrideComState = false) {
+   if ((iotWebConf.getState() == IOTWEBCONF_STATE_ONLINE) || overrideComState) {
+      digitalWrite(LED_BUILTIN, HIGH);
+   }
 }
 
+/**
+ * @brief Signal connection state
+ */
+void signalConnectionState() {
+   if (iotWebConf.getState() == IOTWEBCONF_STATE_ONLINE) {
+      failedWifiConnections = 0;
+      return;
+   }
+  
+   if (millis() > nextLedChange) {
+      ledState = !ledState;
+      if (ledState) {
+         nextLedChange = iotWebConf.getState() * 250;
+         ledOn(true);
+      }
+      else {
+         nextLedChange = 100;
+         ledOff(true);
+      }
+      nextLedChange += millis();
+   }
+   iotWebConf.doLoop();
+}
+
+/**
+ * @brief Wait the given time in ms
+ */
 void delayMs(unsigned long delayMs) {
    unsigned long start = millis();
    while (millis() - start < delayMs) {
       iotWebConf.doLoop();
+      signalConnectionState();
       delay(1); 
    }
-}
-/**
-* @brief Blink function for status feedback
-*/
-void blink(int count, int onDuration, int offDuration, int delayAfter) {
-   for (int i = 0; i < count; i++) {
-      ledOn();
-      delayMs(onDuration);
-      ledOff();
-      delayMs(offDuration);
-   }
-   delayMs(delayAfter);
 }
 
 /**
@@ -312,20 +340,19 @@ uint16_t updateEmeterPacket() {
 int readSerial() {
    // Wait until something is received
    Serial.print("W");
+   ledOff();
    int flashcount = 0;
    while (!Serial.available()) {
       flashcount++;
-      if (flashcount == 490) {
+      if (flashcount == 390) {
          ledOn();
       }
-      else if (flashcount > 500) {
+      else if (flashcount > 400) {
          ledOff();
          flashcount = 0;
          ++readErrors;
       }
-      else {
-         delayMs(5);
-      }
+      delayMs(5);
    }
 
    // We got some bytes. Read until next pause
@@ -342,6 +369,7 @@ int readSerial() {
 */
 int readTestPacket() {
     Serial.print("w");
+    ledOff();   
     for (int i = 0; i < 1000 - TEST_PACKET_RECEIVE_TIME_MS; i += 5) {
       delayMs(5);
     }
@@ -375,18 +403,18 @@ void handleRoot()
 void handleData() {
     String data = "{";
     if (smlParser.getParsedOk() > 0) {
-    data += "\"PowerIn\" : ";
-    data += smlParser.getPowerInW() / 100.0;
-    data += ",\"EnergyIn\" : ";
-    data += smlParser.getEnergyInWh() / 100.0;
-    data += ",\"PowerOut\" : ";
-    data += smlParser.getPowerOutW() / 100.0;
-    data += ",\"EnergyOut\" : ";
-    data += smlParser.getEnergyOutWh() / 100.0;
-    data += ",\"Ok\" : ";
-    data += (unsigned int)smlParser.getParsedOk();
-    data += ",\"Errors\" : ";
-    data += (unsigned int)smlParser.getParseErrors() + readErrors;
+       data += "\"PowerIn\" : ";
+       data += smlParser.getPowerInW() / 100.0;
+       data += ",\"EnergyIn\" : ";
+       data += smlParser.getEnergyInWh() / 100.0;
+       data += ",\"PowerOut\" : ";
+       data += smlParser.getPowerOutW() / 100.0;
+       data += ",\"EnergyOut\" : ";
+       data += smlParser.getEnergyOutWh() / 100.0;
+       data += ",\"Ok\" : ";
+       data += (unsigned int)smlParser.getParsedOk();
+       data += ",\"Errors\" : ";
+       data += (unsigned int)smlParser.getParseErrors() + readErrors;
     }
     data += "}";
 
@@ -458,7 +486,6 @@ IotWebConfWifiAuthInfo* handleWifiConnectionFailed() {
 void setup() {
    // Initialize the LED_BUILTIN pin as an output
    pinMode(LED_BUILTIN, OUTPUT);
-   ledOff();
   
    // Open serial communications and wait for port to open      
    Serial.begin(9600);
@@ -500,22 +527,12 @@ void setup() {
    server.onNotFound([]() { iotWebConf.handleNotFound(); });
 
    Serial.println("Initialization done.");
-   blink(3, 500, 250, 0);
 }
 
 /**
 * @brief Main loop
 */
 void loop() {
-   // Do not process meter data, if we are not connected at all.
-   if (iotWebConf.getState() != IOTWEBCONF_STATE_ONLINE) {
-      ledOn();
-      iotWebConf.doLoop();
-      return;
-   }
-   ledOff();
-   failedWifiConnections = 0;
-   
    Serial.print("_");
 
    // Read the next packet
@@ -557,12 +574,11 @@ void loop() {
       }
       else {
          Serial.print("E");
-         ++readErrors;
       }
    }
    else {
-      // Error
-      blink(10, 100, 100, 2000);
+      // Overflow error
+      Serial.print("O");
       ++readErrors;
    }
    Serial.println(".");
