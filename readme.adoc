@@ -65,19 +65,38 @@ If the ESP already receives data from you energy meter, you should see an image 
 
 image::images/configuration.png[]
 
-To configure the ESP, press the [Configuration] button.
+To configure the ESP, press the [Configuration] button. 
 
-If you have setup the IDE, copy the *settings.h.tpl* file to  *settings.h* and check the default settings. At least *WIFI_SSID* and *WIFI_PASSWORD* need to be defined.
+[NOTE]
+====
+If the device was already configured, you are asked for a username and password. The username is *admin* and the password the current AP password.
+====
 
-For more details on configuring the software check the comments in the settings file.
+
+
+The configuration page is divided into two sections: WiFi configuration [2] and meter configuration [3].
+
+.WiFi configuration
+
+Thing name:: Name of the device. This name is also used when in AP mode.
+AP password:: Password to connect to the device when in AP mode (*mandatory*). This password is also needed to change the configuration once the device is set up.
+WiFi SSID:: The name of the WiFi network (*mandatory*).
+WiFi password:: The password to connect to the WiFi network (*mandatory*).
+
+.Meter configuration
+
+Unicast address 1/2:: Up to two unicast addresses may be specified as destination address for the energy-meter telegrams. If none is set, the default multicast address is used.
+Port:: Destination port for the energy-meter telegrams. The default is 9522. If any other port greater than 0 is set, raw SML packets will be send. If this value is set to 0, sending of energy-meter telegrams is turned off.
+Serial number:: The serial number which is used in the energy-meter telegrams.
+
 
 === Raspberry Pi
 
-The software was originally developed for an ESP8266. Experimental support for the Raspberry Pi has been added and tested with a RaspberryPi 2.
+The software was originally developed for an ESP8266. Experimental support for the Raspberry Pi has been added and tested with a RaspberryPi 2. This version comes without a webui.
 
 ==== Hardware
 
-Check the documentation from https://raspberry.tips/raspberrypi-tutorials/smartmeter-stromzaehler-mit-dem-raspberry-pi-auslesen-und-aufzeichnen[raspberry.tips] for settings up the Raspberry Pi and the hardware. In short:
+Check the documentation from https://pgoergen.de/de/2018/05/build-a-smartmeter-reading-head-for-1e/[Paul Görgen] for settings up the Raspberry Pi and the hardware. In short:
 
 * Short leg (collector, anode) of the BPW40 to RxD
 * Long leg (emitter, cathode) of the BPW40 to GND
@@ -85,7 +104,7 @@ Check the documentation from https://raspberry.tips/raspberrypi-tutorials/smartm
 
 [NOTE]
 ====
-In the https://pgoergen.de/de/2018/05/build-a-smartmeter-reading-head-for-1e/[tutorial] of Paul Görgen the BPW40 is used without a resistor. In my case this didn't work and only fragments were received. Adding the resistor fixed that problem.
+In Paul Görgens https://pgoergen.de/de/2018/05/build-a-smartmeter-reading-head-for-1e/[tutorial] the BPW40 is used without a resistor. In my case this didn't work and only fragments were received. Adding the resistor fixed that problem.
 ====
 
 
@@ -108,10 +127,6 @@ Start the application by specifying the port, e.g.:
 ./sml2emeter /dev/ttyAMA0
 ....
 
-.Configuration
-Copy the *settings.h.tpl* file to  *settings.h* and check the default settings. *WIFI_SSID* and *WIFI_PASSWORD* will be ignored, because the application relies on the normal network setup of the Raspberry Pi.
-
-For more details on configuring the software check the comments in the settings file.
 
 == Background information
 
