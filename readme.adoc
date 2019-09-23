@@ -1,6 +1,6 @@
 = D0-SML to SMA Energy Meter converter
 Joern Tuemmler
-v1.0, June 2019: Final
+v1.2, September 2019: Final
 :doctype: article
 :encoding: utf-8
 :lang: en
@@ -56,7 +56,17 @@ You need the https://www.arduino.cc/en/Main/Software[Arduino IDE] in order to co
 
 Follow the instructions on https://github.com/esp8266/Arduino[ESP8266 github project page] or  https://www.heise.de/ct/artikel/Arduino-IDE-installieren-und-fit-machen-fuer-ESP8266-und-ESP32-4130814.html[from ct magazine] to setup your environment.
 
+As an additional dependency you need https://github.com/prampec/IotWebConf[IotWebConf, Version 2.3.0]. Install this library via the Arduino IDE.
+
 .Configuration
+After compiling and flashing the software, the ESP8266 provides a WiFi access point with the name *sml2emeter*. To configure the software, connect to this access point with the password *sml2emeter*. If supported by your mobile device, you will be automatically redirected to the web-server of the ESP. If not, open a web-browser and enter the ip-address *192.168.4.1*.
+
+If the ESP already receives data from you energy meter, you should see an image like in [1].
+
+image::images/configuration.png[]
+
+To configure the ESP, press the [Configuration] button.
+
 If you have setup the IDE, copy the *settings.h.tpl* file to  *settings.h* and check the default settings. At least *WIFI_SSID* and *WIFI_PASSWORD* need to be defined.
 
 For more details on configuring the software check the comments in the settings file.
