@@ -16,6 +16,7 @@
 #include <IotWebConf.h>
 #include <ESP8266WiFi.h>
 #include <WiFiUDP.h>
+#include <BlynkSimpleEsp8266.h>
 #include "util/sml_testpacket.h"
 #include "smlparser.h"
 #include "emeterpacket.h"
@@ -128,6 +129,12 @@ IotWebConfParameter destinationAddress1Param("Unicast address 1","destinationAdd
 IotWebConfParameter destinationAddress2Param("Unicast address 2","destinationAddress2",destinationAddress2Value,STRING_LEN,"");
 IotWebConfParameter portParam("Port","port",portValue,NUMBER_LEN,"number",portValue,portValue,"min='0' max='65535' step='1'");
 
+// Blynk integration
+char authTokenValue[STRING_LEN] = "";
+IotWebConfSeparator separator2("Blynk configuration");
+IotWebConfParameter authTokenParam("Auth. token","authToken",authTokenValue,STRING_LEN,"");
+bool useBlynk = false;
+
 /**
 * @brief Turn status led on
 */
@@ -177,6 +184,9 @@ void delayMs(unsigned long delayMs) {
    unsigned long start = millis();
    while (millis() - start < delayMs) {
       iotWebConf.doLoop();
+      if (useBlynk) {
+         Blynk.run();
+      }
       signalConnectionState();
       delay(1); 
    }
@@ -334,6 +344,9 @@ void configSaved() {
    Serial.print("numDestAddresses: "); Serial.println(numDestAddresses);
 
    emeterPacket.init(atoi(serialNumberValue));
+
+   useBlynk = strlen(authTokenValue) > 0;
+   Blynk.config(authTokenValue);
 }
 
 /**
@@ -378,6 +391,10 @@ void setup() {
    iotWebConf.addParameter(&destinationAddress2Param);
    iotWebConf.addParameter(&portParam);
    iotWebConf.addParameter(&serialNumberParam);
+
+   iotWebConf.addParameter(&separator2);
+   iotWebConf.addParameter(&authTokenParam);
+   
    iotWebConf.setConfigSavedCallback(&configSaved);
    iotWebConf.setFormValidator(&formValidator);
    iotWebConf.setupUpdateServer(&httpUpdater,"/update");
@@ -443,6 +460,14 @@ void loop() {
       else {
          Serial.print("E");
       }
+      
+      if ((iotWebConf.getState() == IOTWEBCONF_STATE_ONLINE) && (useBlynk)) {
+         Blynk.virtualWrite(V0, (smlParser.getPowerInW() - smlParser.getPowerOutW()) / 100);
+         Blynk.virtualWrite(V1, smlParser.getEnergyInWh() / 100);
+         Blynk.virtualWrite(V2, smlParser.getEnergyOutWh() / 100);
+         Blynk.virtualWrite(V3, smlParser.getParsedOk());
+         Blynk.virtualWrite(V4, smlParser.getParseErrors());
+      }      
    }
    else {
       // Overflow error
