@@ -12,7 +12,7 @@ v1.2, September 2019: Final
 
 == Introduction
 
-This sketch may be used to read SML telegrams from an infrared D0 interface, convert it to SMA energy-meter telegrams and send it via UDP.
+This sketch may be used to read SML telegrams from an infrared D0 interface, convert them to SMA energy-meter telegrams and them it via UDP.
 
 So far it has been tested with the following meters:
 
