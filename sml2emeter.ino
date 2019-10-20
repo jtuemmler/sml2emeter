@@ -25,7 +25,7 @@
 // ----------------------------------------------------------------------------
 
 // Application version
-const char VERSION[] = "Version 1.2";
+const char VERSION[] = "Version 1.3";
 
 // Timeout for reading SML packets
 const int SERIAL_TIMEOUT_MS = 100;
@@ -43,6 +43,10 @@ const IPAddress MCAST_ADDRESS = IPAddress(239, 12, 255, 254);
 
 // Port used for energy meter packets
 const uint16_t DESTINATION_PORT = 9522;
+
+// Debugging (set SML_PORT = 0 to disable)
+const IPAddress SML_ADDRESS = IPAddress(192, 168, 2, 100);
+const uint16_t SML_PORT = 9000;
 
 // ----------------------------------------------------------------------------
 // Constants for IotWebConf
@@ -282,8 +286,10 @@ void handleData() {
     }
     data += "\"Ok\" : ";
     data += (unsigned int)smlParser.getParsedOk();
-    data += ",\"Errors\" : ";
-    data += (unsigned int)smlParser.getParseErrors() + readErrors;
+    data += ",\"ReadErrors\" : ";
+    data += (unsigned int)readErrors;
+    data += ",\"ParseErrors\" : ";
+    data += (unsigned int)smlParser.getParseErrors();
     data += "}";
 
     server.send(200, "application/json", data);
@@ -442,6 +448,12 @@ void loop() {
       }
       else {
          Serial.print("E");
+      }
+      // Debugging
+      if (SML_PORT > 0) {
+         Udp.beginPacket(SML_ADDRESS, SML_PORT);
+         Udp.write(smlPacket, smlPacketLength);
+         Udp.endPacket();
       }
    }
    else {

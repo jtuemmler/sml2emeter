@@ -52,7 +52,9 @@ public:
          _crc16.init();
          _crc16.calc(pPacket + messageStart, messageLength);
          if (crc16Expected == _crc16.getCrc()) {
-            parseMessageBody(messageBody);
+            if (parseMessageBody(messageBody)) {
+               break;
+            }
             // Skip 'end of message'
             ++pos;
          }
@@ -123,11 +125,11 @@ protected:
     * @brief Parse the message body and store parsed information
     * @param pos  Position in the packet
     */
-   void parseMessageBody(int pos) {
+   bool parseMessageBody(int pos) {
       getLength(pos);            // Skip list identifier of message
       uint16_t message = (uint16_t)getNextValue(pos);
       if (message != SML_GET_LIST_RES) {
-         return;
+         return false;
       }
       getLength(pos);            // Skip list identifier of message body
       getNextElement(pos, 4);    // Skip first 4 entries of GET_LIST_RES message
@@ -177,6 +179,7 @@ protected:
             }
          }
       }
+      return true;
    }
 
    /**
