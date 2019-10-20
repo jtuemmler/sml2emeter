@@ -46,7 +46,7 @@ const uint16_t DESTINATION_PORT = 9522;
 
 // Debugging (set SML_PORT = 0 to disable)
 const IPAddress SML_ADDRESS = IPAddress(192, 168, 2, 100);
-const uint16_t SML_PORT = 9000;
+const uint16_t SML_PORT = 0;
 
 // ----------------------------------------------------------------------------
 // Constants for IotWebConf
