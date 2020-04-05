@@ -6,7 +6,8 @@
 * 
 * Dependencies:
 * IotWebConf, Version 2.3.0
-*
+* PubSubClient, Version 2.7.0
+* 
 * Configuration:
 * This sketch provides a web-server for configuration.
 * For more details, see the readme:
@@ -16,6 +17,7 @@
 #include <IotWebConf.h>
 #include <ESP8266WiFi.h>
 #include <WiFiUDP.h>
+#include <PubSubClient.h>
 #include "util/sml_testpacket.h"
 #include "smlparser.h"
 #include "emeterpacket.h"
@@ -25,7 +27,7 @@
 // ----------------------------------------------------------------------------
 
 // Application version
-const char VERSION[] = "Version 1.3";
+const char VERSION[] = "Version 1.4";
 
 // Timeout for reading SML packets
 const int SERIAL_TIMEOUT_MS = 100;
@@ -62,7 +64,7 @@ const int STRING_LEN = 128;
 const int NUMBER_LEN = 32;
 
 // Configuration specific key. The value should be modified if config structure was changed.
-const char CONFIG_VERSION[] = "v1";
+const char CONFIG_VERSION[] = "v2";
 
 // When CONFIG_PIN is pulled to ground on startup, the Thing will use the initial
 //   password to buld an AP. (E.g. in case of lost password)
@@ -117,6 +119,11 @@ WebServer server(80);
 // HTTP update server
 HTTPUpdateServer httpUpdater;
 
+// MQTT Client
+WiFiClient wifiClient;
+PubSubClient mqttClient(wifiClient);
+String mqttTopic;
+
 // IotWebConf instance
 IotWebConf iotWebConf(THING_NAME, &dnsServer, &server, WIFI_INITIAL_AP_PASSWORD, CONFIG_VERSION);
 
@@ -125,12 +132,18 @@ char destinationAddress1Value[STRING_LEN] = "";
 char destinationAddress2Value[STRING_LEN] = "";
 char serialNumberValue[NUMBER_LEN] = "";
 char portValue[NUMBER_LEN] = "";
+char mqttBrockerAddressValue[NUMBER_LEN] = "";
+char mqttPortValue[NUMBER_LEN] = "1883";
 
 IotWebConfSeparator separator1("Meter configuration");
 IotWebConfParameter serialNumberParam("Serial number","serialNumber",serialNumberValue,NUMBER_LEN,"number",serialNumberValue,serialNumberValue,"min='0' max='999999999' step='1'");
 IotWebConfParameter destinationAddress1Param("Unicast address 1","destinationAddress1",destinationAddress1Value,STRING_LEN,"");
 IotWebConfParameter destinationAddress2Param("Unicast address 2","destinationAddress2",destinationAddress2Value,STRING_LEN,"");
 IotWebConfParameter portParam("Port","port",portValue,NUMBER_LEN,"number",portValue,portValue,"min='0' max='65535' step='1'");
+
+IotWebConfSeparator separator2("MQTT configuration");
+IotWebConfParameter mqttBrockerAddressParam("Broker address","mqttBrockerAddress",mqttBrockerAddressValue,STRING_LEN,"");
+IotWebConfParameter mqttPortParam("Broker port","mqttPort",mqttPortValue,NUMBER_LEN,"number",mqttPortValue,mqttPortValue,"min='0' max='65535' step='1'");
 
 /**
 * @brief Turn status led on
@@ -269,30 +282,40 @@ void handleRoot()
 }
 
 /**
- * @brief Return the current readings as json object
+ * @brief Get current meter data as JSON data
+ * @param detailed Return detailed data if true
  */
-void handleData() {
+String getCurrentDataAsJson(bool detailed = true) {
     String data = "{";
     if (smlParser.getParsedOk() > 0) {
-       data += "\"PowerIn\" : ";
+       data += "\"PowerIn\":";
        data += smlParser.getPowerInW() / 100.0;
-       data += ",\"EnergyIn\" : ";
+       data += ",\"EnergyIn\":";
        data += smlParser.getEnergyInWh() / 100.0;
-       data += ",\"PowerOut\" : ";
+       data += ",\"PowerOut\":";
        data += smlParser.getPowerOutW() / 100.0;
-       data += ",\"EnergyOut\" : ";
+       data += ",\"EnergyOut\":";
        data += smlParser.getEnergyOutWh() / 100.0;
        data += ",";
     }
-    data += "\"Ok\" : ";
-    data += (unsigned int)smlParser.getParsedOk();
-    data += ",\"ReadErrors\" : ";
-    data += (unsigned int)readErrors;
-    data += ",\"ParseErrors\" : ";
-    data += (unsigned int)smlParser.getParseErrors();
+    if (detailed) {
+      data += "\"Ok\":";
+      data += (unsigned int)smlParser.getParsedOk();
+      data += ",\"ReadErrors\":";
+      data += (unsigned int)readErrors;
+      data += ",\"ParseErrors\":";
+      data += (unsigned int)smlParser.getParseErrors();
+    }
     data += "}";
+    
+    return data;  
+}
 
-    server.send(200, "application/json", data);
+/**
+ * @brief Return the current readings as json object
+ */
+void handleData() {
+    server.send(200, "application/json", getCurrentDataAsJson());
 }
 
 /**
@@ -340,6 +363,15 @@ void configSaved() {
    Serial.print("numDestAddresses: "); Serial.println(numDestAddresses);
 
    emeterPacket.init(atoi(serialNumberValue));
+
+   mqttClient.disconnect();
+   if (mqttBrockerAddressValue[0] != 0) {
+     mqttTopic = "/";
+     mqttTopic += iotWebConf.getThingName();
+     mqttTopic += "/data";
+     Serial.print("mqttTopic; "); Serial.println(mqttTopic); 
+     mqttClient.setServer(mqttBrockerAddressValue, atoi(mqttPortValue));
+   }
 }
 
 /**
@@ -384,6 +416,9 @@ void setup() {
    iotWebConf.addParameter(&destinationAddress2Param);
    iotWebConf.addParameter(&portParam);
    iotWebConf.addParameter(&serialNumberParam);
+   iotWebConf.addParameter(&separator2);
+   iotWebConf.addParameter(&mqttBrockerAddressParam);
+   iotWebConf.addParameter(&mqttPortParam);
    iotWebConf.setConfigSavedCallback(&configSaved);
    iotWebConf.setFormValidator(&formValidator);
    iotWebConf.setupUpdateServer(&httpUpdater,"/update");
@@ -404,6 +439,64 @@ void setup() {
 }
 
 /**
+ * @brief Publish data for emeter-protocol
+ * @param smlPacketLength length of the SML packet
+ */
+void publishEmeter(int smlPacketLength) {
+  if (port > 0) {
+    updateEmeterPacket();
+    int i = 0;
+    do {
+       Serial.print("S");
+       if (numDestAddresses == 0) {
+          Udp.beginPacketMulticast(MCAST_ADDRESS, port, WiFi.localIP(), 1);
+       }
+       else {
+          Udp.beginPacket(destAddresses[i], port);
+       }
+    
+       if (port == DESTINATION_PORT) {
+          Udp.write(emeterPacket.getData(), emeterPacket.getLength());
+       }
+       else {
+          Udp.write(smlPacket, smlPacketLength);
+       }
+    
+       // Send paket
+       Udp.endPacket();
+       ++i;
+    } while (i < numDestAddresses);
+  }
+}
+
+/**
+ * @brief Publish data to mqtt broker
+ */
+void publishMqtt() {
+  if (mqttBrockerAddressValue[0] == 0) {
+    return;
+  }
+  Serial.print("M");
+
+  if (!mqttClient.connected()) {
+    if (!mqttClient.connect("sml2emeter")) {
+      Serial.print("F");
+      Serial.print(mqttClient.state());
+      return;
+    }
+    Serial.print("C");
+  }
+
+  mqttClient.loop();
+  if (mqttClient.publish(mqttTopic.c_str(),getCurrentDataAsJson(false).c_str()) == 0) {
+    Serial.print("S");
+  }
+  else {
+    Serial.print("E");    
+  }
+}
+
+/**
 * @brief Main loop
 */
 void loop() {
@@ -421,30 +514,8 @@ void loop() {
    // Send the packet if a valid telegram was received
    if (smlPacketLength <= SML_PACKET_SIZE) {
       if (smlParser.parsePacket(smlPacket, smlPacketLength)) {
-         if (port > 0) {
-            updateEmeterPacket();
-            int i = 0;
-            do {
-               Serial.print("S");
-               if (numDestAddresses == 0) {
-                  Udp.beginPacketMulticast(MCAST_ADDRESS, port, WiFi.localIP(), 1);
-               }
-               else {
-                  Udp.beginPacket(destAddresses[i], port);
-               }
-
-               if (port == DESTINATION_PORT) {
-                  Udp.write(emeterPacket.getData(), emeterPacket.getLength());
-               }
-               else {
-                  Udp.write(smlPacket, smlPacketLength);
-               }
-
-               // Send paket
-               Udp.endPacket();
-               ++i;
-            } while (i < numDestAddresses);
-         }
+        publishEmeter(smlPacketLength);
+        publishMqtt();
       }
       else {
          Serial.print("E");
