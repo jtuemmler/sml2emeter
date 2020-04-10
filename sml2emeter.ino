@@ -123,6 +123,7 @@ HTTPUpdateServer httpUpdater;
 WiFiClient wifiClient;
 PubSubClient mqttClient(wifiClient);
 String mqttTopic;
+int mqttRetryCounter = 0;
 
 // IotWebConf instance
 IotWebConf iotWebConf(THING_NAME, &dnsServer, &server, WIFI_INITIAL_AP_PASSWORD, CONFIG_VERSION);
@@ -296,7 +297,9 @@ String getCurrentDataAsJson(bool detailed = true) {
        data += smlParser.getPowerOutW() / 100.0;
        data += ",\"EnergyOut\":";
        data += smlParser.getEnergyOutWh() / 100.0;
-       data += ",";
+       if (detailed) {
+          data += ",";
+       }
     }
     if (detailed) {
       data += "\"Ok\":";
@@ -369,7 +372,7 @@ void configSaved() {
      mqttTopic = "/";
      mqttTopic += iotWebConf.getThingName();
      mqttTopic += "/data";
-     Serial.print("mqttTopic; "); Serial.println(mqttTopic); 
+     Serial.print("mqttTopic: "); Serial.println(mqttTopic); 
      mqttClient.setServer(mqttBrockerAddressValue, atoi(mqttPortValue));
    }
 }
@@ -473,18 +476,22 @@ void publishEmeter(int smlPacketLength) {
  * @brief Publish data to mqtt broker
  */
 void publishMqtt() {
-  if (mqttBrockerAddressValue[0] == 0) {
+  if ((mqttBrockerAddressValue[0] == 0) || (iotWebConf.getState() != IOTWEBCONF_STATE_ONLINE)) {
     return;
   }
+
   Serial.print("M");
 
   if (!mqttClient.connected()) {
-    if (!mqttClient.connect("sml2emeter")) {
-      Serial.print("F");
-      Serial.print(mqttClient.state());
-      return;
-    }
-    Serial.print("C");
+     if (--mqttRetryCounter <= 0) {
+        mqttRetryCounter = 60;
+        if (!mqttClient.connect("sml2emeter")) {
+           Serial.print("F");
+           Serial.print(mqttClient.state());
+           return;
+        }
+        Serial.print("C");
+     }
   }
 
   mqttClient.loop();
