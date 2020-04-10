@@ -13,7 +13,7 @@ public:
    SmlParser() : _parsedOk(0U), _parseErrors(0U), _powerInW(0U), _powerOutW(0U), _energyInWh(0UL), _energyOutWh(0UL) {}
 
    /// Getters. All values are given in centi-W or centi-Wh
-   inline uint32_t getParsedOk() const  { return _parsedOk; }
+   inline uint32_t getParsedOk() const { return _parsedOk; }
    inline uint32_t getParseErrors() const { return _parseErrors; }
    inline uint32_t getPowerInW() const { return _powerInW; }
    inline uint32_t getPowerOutW() const { return _powerOutW; }
@@ -141,7 +141,7 @@ protected:
          uint8_t type = _pPacket[pos++];
          uint8_t tariff = _pPacket[pos++];
          ++pos;                  // Skip next value
-         getNextElement(pos,2);  // Skip status and timestamp
+         getNextElement(pos, 2);  // Skip status and timestamp
          getNextValue(pos);      // Skip unit
          int8_t scale = (int8_t)getNextValue(pos);
          int64_t value = (int64_t)getNextValue(pos);
@@ -151,31 +151,31 @@ protected:
          if ((tariff == 0) && (scale >= SML_MIN_SCALE) && (scale <= SML_MAX_SCALE)) {
             value *= SCALE_FACTORS[scale - SML_MIN_SCALE];
             switch (type) {
-               case OBIS_INSTANTANEOUS_POWER_TYPE:
-                  switch (index) {
-                     case OBIS_POSITIVE_ACTIVE_POWER:
-                        _powerInW = (uint32_t)value;
-                        break;
-                     case OBIS_NEGATIVE_ACTIVE_POWER:
-                        _powerOutW = (uint32_t)value;;
-                        break;
-                     case OBIS_SUM_ACTIVE_POWER:
-                        _powerInW = (uint32_t)(value >= 0 ? value : 0U);
-                        _powerOutW = (uint32_t)(value <= 0 ? -value : 0U);
-                        break;
-                  }
+            case OBIS_INSTANTANEOUS_POWER_TYPE:
+               switch (index) {
+               case OBIS_POSITIVE_ACTIVE_POWER:
+                  _powerInW = (uint32_t)value;
                   break;
+               case OBIS_NEGATIVE_ACTIVE_POWER:
+                  _powerOutW = (uint32_t)value;;
+                  break;
+               case OBIS_SUM_ACTIVE_POWER:
+                  _powerInW = (uint32_t)(value >= 0 ? value : 0U);
+                  _powerOutW = (uint32_t)(value <= 0 ? -value : 0U);
+                  break;
+               }
+               break;
 
-               case OBIS_ENERGY_TYPE:
-                  switch (index) {
-                     case OBIS_POSITIVE_ACTIVE_POWER:
-                        _energyInWh = (uint64_t)value;
-                        break;
-                     case OBIS_NEGATIVE_ACTIVE_POWER:
-                        _energyOutWh = (uint64_t)value;
-                        break;
-                  }
+            case OBIS_ENERGY_TYPE:
+               switch (index) {
+               case OBIS_POSITIVE_ACTIVE_POWER:
+                  _energyInWh = (uint64_t)value;
                   break;
+               case OBIS_NEGATIVE_ACTIVE_POWER:
+                  _energyOutWh = (uint64_t)value;
+                  break;
+               }
+               break;
             }
          }
       }

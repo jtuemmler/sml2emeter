@@ -21,7 +21,7 @@ WiFiUDP::WiFiUDP() : _pos(0), _length(0) {
 
    if (WSAStartup(MAKEWORD(2, 2), &wsa) != 0)
    {
-      printf("WSAStartup() failed with error code : %d" , WSAGetLastError());
+      printf("WSAStartup() failed with error code : %d", WSAGetLastError());
       exit(EXIT_FAILURE);
    }
 #endif

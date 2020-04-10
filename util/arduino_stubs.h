@@ -36,7 +36,7 @@ public:
 
    void replace(const char s1[], const char s2[]) {}
 
-   operator const char*()  { return std::string::c_str(); }
+   operator const char*() { return std::string::c_str(); }
 
    String& operator += (const char pOther[]) {
       std::string::append(pOther);
@@ -45,7 +45,7 @@ public:
 
    String& operator += (const double other) {
       char converted[20] = { 0 };
-      snprintf(converted,sizeof(converted) - 1, "%g", other);
+      snprintf(converted, sizeof(converted) - 1, "%g", other);
       std::string::append(converted);
       return *this;
    }

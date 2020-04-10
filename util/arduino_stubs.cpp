@@ -67,7 +67,7 @@ bool SerialImpl::available() {
       return (bytesAvailable > 0);
    }
 #ifndef _WIN32
-   ioctl(_fd,FIONREAD,&bytesAvailable);
+   ioctl(_fd, FIONREAD, &bytesAvailable);
 #endif
    return (bytesAvailable > 0);
 }
@@ -94,7 +94,7 @@ int SerialImpl::readBytes(byte *pBuffer, int bufferSize) {
    int timeout = _timeout;
    while ((timeout > 0) && (bufferSize > 0)) {
       if (available()) {
-         int bytesRead = read(_fd,(void*)(pBuffer + length),bufferSize);
+         int bytesRead = read(_fd, (void*)(pBuffer + length), bufferSize);
          bufferSize -= bytesRead;
          length += bytesRead;
          timeout = _timeout;
@@ -111,7 +111,7 @@ int SerialImpl::readBytes(byte *pBuffer, int bufferSize) {
 #ifndef _WIN32
 char *itoa(int value, char *str, int base)
 {
-   sprintf(str,"%d",value);
+   sprintf(str, "%d", value);
    return str;
 }
 #endif

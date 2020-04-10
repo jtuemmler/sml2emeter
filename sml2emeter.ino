@@ -1,13 +1,13 @@
 /**
 * ESP8266 SML to SMA energy meter converter
 *
-* ﻿This sketch may be used to read SML telegrams from an infrared D0 interface, convert it to SMA energy-meter 
+* ﻿This sketch may be used to read SML telegrams from an infrared D0 interface, convert it to SMA energy-meter
 * telegrams and send it via UDP.
-* 
+*
 * Dependencies:
 * IotWebConf, Version 2.3.0
 * PubSubClient, Version 2.7.0
-* 
+*
 * Configuration:
 * This sketch provides a web-server for configuration.
 * For more details, see the readme:
@@ -137,14 +137,14 @@ char mqttBrockerAddressValue[NUMBER_LEN] = "";
 char mqttPortValue[NUMBER_LEN] = "1883";
 
 IotWebConfSeparator separator1("Meter configuration");
-IotWebConfParameter serialNumberParam("Serial number","serialNumber",serialNumberValue,NUMBER_LEN,"number",serialNumberValue,serialNumberValue,"min='0' max='999999999' step='1'");
-IotWebConfParameter destinationAddress1Param("Unicast address 1","destinationAddress1",destinationAddress1Value,STRING_LEN,"");
-IotWebConfParameter destinationAddress2Param("Unicast address 2","destinationAddress2",destinationAddress2Value,STRING_LEN,"");
-IotWebConfParameter portParam("Port","port",portValue,NUMBER_LEN,"number",portValue,portValue,"min='0' max='65535' step='1'");
+IotWebConfParameter serialNumberParam("Serial number", "serialNumber", serialNumberValue, NUMBER_LEN, "number", serialNumberValue, serialNumberValue, "min='0' max='999999999' step='1'");
+IotWebConfParameter destinationAddress1Param("Unicast address 1", "destinationAddress1", destinationAddress1Value, STRING_LEN, "");
+IotWebConfParameter destinationAddress2Param("Unicast address 2", "destinationAddress2", destinationAddress2Value, STRING_LEN, "");
+IotWebConfParameter portParam("Port", "port", portValue, NUMBER_LEN, "number", portValue, portValue, "min='0' max='65535' step='1'");
 
 IotWebConfSeparator separator2("MQTT configuration");
-IotWebConfParameter mqttBrockerAddressParam("Broker address","mqttBrockerAddress",mqttBrockerAddressValue,STRING_LEN,"");
-IotWebConfParameter mqttPortParam("Broker port","mqttPort",mqttPortValue,NUMBER_LEN,"number",mqttPortValue,mqttPortValue,"min='0' max='65535' step='1'");
+IotWebConfParameter mqttBrockerAddressParam("Broker address", "mqttBrockerAddress", mqttBrockerAddressValue, STRING_LEN, "");
+IotWebConfParameter mqttPortParam("Broker port", "mqttPort", mqttPortValue, NUMBER_LEN, "number", mqttPortValue, mqttPortValue, "min='0' max='65535' step='1'");
 
 /**
 * @brief Turn status led on
@@ -172,7 +172,7 @@ void signalConnectionState() {
       failedWifiConnections = 0;
       return;
    }
-  
+
    if (millis() > nextLedChange) {
       ledState = !ledState;
       if (ledState) {
@@ -196,7 +196,7 @@ void delayMs(unsigned long delayMs) {
    while (millis() - start < delayMs) {
       iotWebConf.doLoop();
       signalConnectionState();
-      delay(1); 
+      delay(1);
    }
 }
 
@@ -253,17 +253,17 @@ int readSerial() {
 * @brief Read test packet
 */
 int readTestPacket() {
-    Serial.print("w");
-    ledOff();   
-    for (int i = 0; i < 1000 - TEST_PACKET_RECEIVE_TIME_MS; i += 5) {
+   Serial.print("w");
+   ledOff();
+   for (int i = 0; i < 1000 - TEST_PACKET_RECEIVE_TIME_MS; i += 5) {
       delayMs(5);
-    }
-    Serial.print("r");
-    ledOn();    
-    delay(TEST_PACKET_RECEIVE_TIME_MS);
-    memcpy(smlPacket, SML_TEST_PACKET, SML_TEST_PACKET_LENGTH);
-    ledOff();
-    return SML_TEST_PACKET_LENGTH;
+   }
+   Serial.print("r");
+   ledOn();
+   delay(TEST_PACKET_RECEIVE_TIME_MS);
+   memcpy(smlPacket, SML_TEST_PACKET, SML_TEST_PACKET_LENGTH);
+   ledOff();
+   return SML_TEST_PACKET_LENGTH;
 }
 
 /**
@@ -271,15 +271,15 @@ int readTestPacket() {
  */
 void handleRoot()
 {
-    // Let IotWebConf test and handle captive portal requests.
-    if (iotWebConf.handleCaptivePortal()) {
-        // Captive portal request were already served.
-        return;
-    }
+   // Let IotWebConf test and handle captive portal requests.
+   if (iotWebConf.handleCaptivePortal()) {
+      // Captive portal request were already served.
+      return;
+   }
 
-    String page = INDEX_HTML;
-    page.replace("{v}",VERSION);
-    server.send(200, "text/html", page);
+   String page = INDEX_HTML;
+   page.replace("{v}", VERSION);
+   server.send(200, "text/html", page);
 }
 
 /**
@@ -287,38 +287,38 @@ void handleRoot()
  * @param detailed Return detailed data if true
  */
 String getCurrentDataAsJson(bool detailed = true) {
-    String data = "{";
-    if (smlParser.getParsedOk() > 0) {
-       data += "\"PowerIn\":";
-       data += smlParser.getPowerInW() / 100.0;
-       data += ",\"EnergyIn\":";
-       data += smlParser.getEnergyInWh() / 100.0;
-       data += ",\"PowerOut\":";
-       data += smlParser.getPowerOutW() / 100.0;
-       data += ",\"EnergyOut\":";
-       data += smlParser.getEnergyOutWh() / 100.0;
-       if (detailed) {
-          data += ",";
-       }
-    }
-    if (detailed) {
+   String data = "{";
+   if (smlParser.getParsedOk() > 0) {
+      data += "\"PowerIn\":";
+      data += smlParser.getPowerInW() / 100.0;
+      data += ",\"EnergyIn\":";
+      data += smlParser.getEnergyInWh() / 100.0;
+      data += ",\"PowerOut\":";
+      data += smlParser.getPowerOutW() / 100.0;
+      data += ",\"EnergyOut\":";
+      data += smlParser.getEnergyOutWh() / 100.0;
+      if (detailed) {
+         data += ",";
+      }
+   }
+   if (detailed) {
       data += "\"Ok\":";
       data += (unsigned int)smlParser.getParsedOk();
       data += ",\"ReadErrors\":";
       data += (unsigned int)readErrors;
       data += ",\"ParseErrors\":";
       data += (unsigned int)smlParser.getParseErrors();
-    }
-    data += "}";
-    
-    return data;  
+   }
+   data += "}";
+
+   return data;
 }
 
 /**
  * @brief Return the current readings as json object
  */
 void handleData() {
-    server.send(200, "application/json", getCurrentDataAsJson());
+   server.send(200, "application/json", getCurrentDataAsJson());
 }
 
 /**
@@ -355,10 +355,10 @@ void configSaved() {
    port = atoi(portValue);
    numDestAddresses = 0;
    if (destAddresses[numDestAddresses].fromString(destinationAddress1Value)) {
-     ++numDestAddresses;
+      ++numDestAddresses;
    }
    if (destAddresses[numDestAddresses].fromString(destinationAddress2Value)) {
-     ++numDestAddresses;
+      ++numDestAddresses;
    }
 
    Serial.print("serNo: "); Serial.println(serialNumberValue);
@@ -369,11 +369,11 @@ void configSaved() {
 
    mqttClient.disconnect();
    if (mqttBrockerAddressValue[0] != 0) {
-     mqttTopic = "/";
-     mqttTopic += iotWebConf.getThingName();
-     mqttTopic += "/data";
-     Serial.print("mqttTopic: "); Serial.println(mqttTopic); 
-     mqttClient.setServer(mqttBrockerAddressValue, atoi(mqttPortValue));
+      mqttTopic = "/";
+      mqttTopic += iotWebConf.getThingName();
+      mqttTopic += "/data";
+      Serial.print("mqttTopic: "); Serial.println(mqttTopic);
+      mqttClient.setServer(mqttBrockerAddressValue, atoi(mqttPortValue));
    }
 }
 
@@ -395,7 +395,7 @@ IotWebConfWifiAuthInfo* handleWifiConnectionFailed() {
 void setup() {
    // Initialize the LED_BUILTIN pin as an output
    pinMode(LED_BUILTIN, OUTPUT);
-  
+
    // Open serial communications and wait for port to open      
    Serial.begin(9600);
    while (!Serial);
@@ -412,7 +412,7 @@ void setup() {
 
    itoa(990000000 + ESP.getChipId(), serialNumberValue, 10);
    itoa(DESTINATION_PORT, portValue, 10);
-   
+
    //iotWebConf.setConfigPin(CONFIG_PIN);
    iotWebConf.addParameter(&separator1);
    iotWebConf.addParameter(&destinationAddress1Param);
@@ -424,10 +424,10 @@ void setup() {
    iotWebConf.addParameter(&mqttPortParam);
    iotWebConf.setConfigSavedCallback(&configSaved);
    iotWebConf.setFormValidator(&formValidator);
-   iotWebConf.setupUpdateServer(&httpUpdater,"/update");
+   iotWebConf.setupUpdateServer(&httpUpdater, "/update");
    iotWebConf.getApTimeoutParameter()->visible = false;
    iotWebConf.setWifiConnectionFailedHandler([]() { return handleWifiConnectionFailed(); });
-   
+
    // Initializing the configuration.
    iotWebConf.init();
    configSaved();
@@ -446,61 +446,61 @@ void setup() {
  * @param smlPacketLength length of the SML packet
  */
 void publishEmeter(int smlPacketLength) {
-  if (port > 0) {
-    updateEmeterPacket();
-    int i = 0;
-    do {
-       Serial.print("S");
-       if (numDestAddresses == 0) {
-          Udp.beginPacketMulticast(MCAST_ADDRESS, port, WiFi.localIP(), 1);
-       }
-       else {
-          Udp.beginPacket(destAddresses[i], port);
-       }
-    
-       if (port == DESTINATION_PORT) {
-          Udp.write(emeterPacket.getData(), emeterPacket.getLength());
-       }
-       else {
-          Udp.write(smlPacket, smlPacketLength);
-       }
-    
-       // Send paket
-       Udp.endPacket();
-       ++i;
-    } while (i < numDestAddresses);
-  }
+   if (port > 0) {
+      updateEmeterPacket();
+      int i = 0;
+      do {
+         Serial.print("S");
+         if (numDestAddresses == 0) {
+            Udp.beginPacketMulticast(MCAST_ADDRESS, port, WiFi.localIP(), 1);
+         }
+         else {
+            Udp.beginPacket(destAddresses[i], port);
+         }
+
+         if (port == DESTINATION_PORT) {
+            Udp.write(emeterPacket.getData(), emeterPacket.getLength());
+         }
+         else {
+            Udp.write(smlPacket, smlPacketLength);
+         }
+
+         // Send paket
+         Udp.endPacket();
+         ++i;
+      } while (i < numDestAddresses);
+   }
 }
 
 /**
  * @brief Publish data to mqtt broker
  */
 void publishMqtt() {
-  if ((mqttBrockerAddressValue[0] == 0) || (iotWebConf.getState() != IOTWEBCONF_STATE_ONLINE)) {
-    return;
-  }
+   if ((mqttBrockerAddressValue[0] == 0) || (iotWebConf.getState() != IOTWEBCONF_STATE_ONLINE)) {
+      return;
+   }
 
-  Serial.print("M");
+   Serial.print("M");
 
-  if (!mqttClient.connected()) {
-     if (--mqttRetryCounter <= 0) {
-        mqttRetryCounter = 60;
-        if (!mqttClient.connect("sml2emeter")) {
-           Serial.print("F");
-           Serial.print(mqttClient.state());
-           return;
-        }
-        Serial.print("C");
-     }
-  }
+   if (!mqttClient.connected()) {
+      if (--mqttRetryCounter <= 0) {
+         mqttRetryCounter = 60;
+         if (!mqttClient.connect("sml2emeter")) {
+            Serial.print("F");
+            Serial.print(mqttClient.state());
+            return;
+         }
+         Serial.print("C");
+      }
+   }
 
-  mqttClient.loop();
-  if (mqttClient.publish(mqttTopic.c_str(),getCurrentDataAsJson(false).c_str()) == 0) {
-    Serial.print("S");
-  }
-  else {
-    Serial.print("E");    
-  }
+   mqttClient.loop();
+   if (mqttClient.publish(mqttTopic.c_str(), getCurrentDataAsJson(false).c_str()) == 0) {
+      Serial.print("S");
+   }
+   else {
+      Serial.print("E");
+   }
 }
 
 /**
@@ -516,13 +516,13 @@ void loop() {
    }
    else {
       smlPacketLength = readTestPacket();
-   } 
+   }
 
    // Send the packet if a valid telegram was received
    if (smlPacketLength <= SML_PACKET_SIZE) {
       if (smlParser.parsePacket(smlPacket, smlPacketLength)) {
-        publishEmeter(smlPacketLength);
-        publishMqtt();
+         publishEmeter(smlPacketLength);
+         publishMqtt();
       }
       else {
          Serial.print("E");

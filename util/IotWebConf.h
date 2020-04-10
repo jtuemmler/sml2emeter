@@ -38,15 +38,15 @@ class IotWebConfParameter {
 public:
    IotWebConfParameter() {}
    IotWebConfParameter(
-         const char* label, const char* id, char* valueBuffer, int length,
-         const char* type = "text", const char* placeholder = NULL,
-         const char* defaultValue = NULL, const char* customHtml = NULL,
-         bool visible = true) {
+      const char* label, const char* id, char* valueBuffer, int length,
+      const char* type = "text", const char* placeholder = NULL,
+      const char* defaultValue = NULL, const char* customHtml = NULL,
+      bool visible = true) {
       this->visible = visible;
    }
    IotWebConfParameter(
-         const char* id, char* valueBuffer, int length, const char* customHtml,
-         const char* type = "text") {}
+      const char* id, char* valueBuffer, int length, const char* customHtml,
+      const char* type = "text") {}
 
    const char *getId() { return "Id"; }
    bool visible;
@@ -67,7 +67,7 @@ public:
    void setConfigPin(int configPin) {}
    void setStatusPin(int statusPin) {}
    void setupUpdateServer(
-         HTTPUpdateServer* updateServer, const char* updatePath = "/firmware") {}
+      HTTPUpdateServer* updateServer, const char* updatePath = "/firmware") {}
    bool init() { return true; }
    void doLoop() {}
    bool handleCaptivePortal() { return true; }
@@ -77,10 +77,10 @@ public:
    void setConfigSavedCallback(std::function<void()> func) {}
    void setFormValidator(std::function<bool()> func) {}
    void setApConnectionHandler(
-         std::function<bool(const char* apName, const char* password)> func) {}
+      std::function<bool(const char* apName, const char* password)> func) {}
    void setWifiConnectionHandler(
-         std::function<void(const char* ssid, const char* password)> func) {}
-   void setWifiConnectionFailedHandler( std::function<IotWebConfWifiAuthInfo*()> func ) {}
+      std::function<void(const char* ssid, const char* password)> func) {}
+   void setWifiConnectionFailedHandler(std::function<IotWebConfWifiAuthInfo*()> func) {}
    bool addParameter(IotWebConfParameter* parameter) { return true; }
    const char* getThingName() { return "Thing"; }
    void delay(unsigned long millis) { ::delay(millis); }
