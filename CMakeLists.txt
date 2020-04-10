@@ -26,6 +26,7 @@ add_executable(sml2emeter
    util/WiFiUDP.cpp
    util/ESP8266WiFi.h
    util/IotWebConf.h
+   util/PubSubClient.h
 )
 
 if(NOT MSVC)

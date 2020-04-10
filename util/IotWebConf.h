@@ -23,7 +23,7 @@ public:
 class WebServer {
 public:
    WebServer(int port) {}
-   void send(int code, const char *pResourceType, String &page) {}
+   void send(int code, const char *pResourceType, const String &page) {}
    String arg(const char* id) { return String(); }
    void on(const char *pRessource, std::function<void()> func) {}
    void onNotFound(std::function<void()> func) {}
