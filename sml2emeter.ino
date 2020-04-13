@@ -123,6 +123,7 @@ HTTPUpdateServer httpUpdater;
 WiFiClient wifiClient;
 PubSubClient mqttClient(wifiClient);
 String mqttTopic;
+int mqttPort = 0;
 int mqttRetryCounter = 0;
 
 // IotWebConf instance
@@ -134,17 +135,17 @@ char destinationAddress2Value[STRING_LEN] = "";
 char serialNumberValue[NUMBER_LEN] = "";
 char portValue[NUMBER_LEN] = "";
 char mqttBrockerAddressValue[NUMBER_LEN] = "";
-char mqttPortValue[NUMBER_LEN] = "1883";
+char mqttPortValue[NUMBER_LEN] = "0";
 
 IotWebConfSeparator separator1("Meter configuration");
 IotWebConfParameter serialNumberParam("Serial number", "serialNumber", serialNumberValue, NUMBER_LEN, "number", serialNumberValue, serialNumberValue, "min='0' max='999999999' step='1'");
 IotWebConfParameter destinationAddress1Param("Unicast address 1", "destinationAddress1", destinationAddress1Value, STRING_LEN, "");
 IotWebConfParameter destinationAddress2Param("Unicast address 2", "destinationAddress2", destinationAddress2Value, STRING_LEN, "");
-IotWebConfParameter portParam("Port", "port", portValue, NUMBER_LEN, "number", portValue, portValue, "min='0' max='65535' step='1'");
+IotWebConfParameter portParam("Port (default 9522)", "port", portValue, NUMBER_LEN, "number", portValue, portValue, "min='0' max='65535' step='1'");
 
-IotWebConfSeparator separator2("MQTT configuration");
-IotWebConfParameter mqttBrockerAddressParam("Broker address", "mqttBrockerAddress", mqttBrockerAddressValue, STRING_LEN, "");
-IotWebConfParameter mqttPortParam("Broker port", "mqttPort", mqttPortValue, NUMBER_LEN, "number", mqttPortValue, mqttPortValue, "min='0' max='65535' step='1'");
+IotWebConfSeparator separator2("MQTT broker configuration");
+IotWebConfParameter mqttBrockerAddressParam("Hostname", "mqttBrockerAddress", mqttBrockerAddressValue, STRING_LEN, "");
+IotWebConfParameter mqttPortParam("Port (default 1883)", "mqttPort", mqttPortValue, NUMBER_LEN, "number", mqttPortValue, mqttPortValue, "min='0' max='65535' step='1'");
 
 /**
 * @brief Turn status led on
@@ -368,12 +369,13 @@ void configSaved() {
    emeterPacket.init(atoi(serialNumberValue));
 
    mqttClient.disconnect();
-   if (mqttBrockerAddressValue[0] != 0) {
+   mqttPort = mqttBrockerAddressValue[0] == 0 ? 0 : atoi(mqttPortValue);
+   if (mqttPort > 0) {
       mqttTopic = "/";
       mqttTopic += iotWebConf.getThingName();
       mqttTopic += "/data";
       Serial.print("mqttTopic: "); Serial.println(mqttTopic);
-      mqttClient.setServer(mqttBrockerAddressValue, atoi(mqttPortValue));
+      mqttClient.setServer(mqttBrockerAddressValue, mqttPort);
    }
 }
 
@@ -476,7 +478,7 @@ void publishEmeter(int smlPacketLength) {
  * @brief Publish data to mqtt broker
  */
 void publishMqtt() {
-   if ((mqttBrockerAddressValue[0] == 0) || (iotWebConf.getState() != IOTWEBCONF_STATE_ONLINE)) {
+   if ((mqttPort == 0) || (iotWebConf.getState() != IOTWEBCONF_STATE_ONLINE)) {
       return;
    }
 
