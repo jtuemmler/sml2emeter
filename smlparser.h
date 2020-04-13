@@ -32,11 +32,6 @@ public:
 
       int pos = 0;
 
-      if (!(checkMark(pos, SML_ESCAPE) && checkMark(pos, SML_VERSION1))) {
-         ++_parseErrors;
-         return false;
-      }
-
       while (pos < packetLength) {
          if (pPacket[pos] == SML_END_OF_MESSAGE) {
             break;
@@ -46,7 +41,7 @@ public:
          int messageBody = getNextElement(pos, 3);
          getNextElement(pos); // Skip to crc
          int messageLength = pos - messageStart;
-         uint16_t crc16Expected = (uint16_t)getNextValue(pos);
+         uint16_t crc16Expected = (uint16_t)getNextIntValue(pos);
 
          // Check crc
          _crc16.init();
@@ -74,9 +69,6 @@ protected:
    // For details see:
    // https://www.bsi.bund.de/SharedDocs/Downloads/DE/BSI/Publikationen/TechnischeRichtlinien/TR03109/TR-03109-1_Anlage_Feinspezifikation_Drahtgebundene_LMN-Schnittstelle_Teilb.pdf?__blob=publicationFile
    // ----------------------------------------------------------------------------
-   static const uint8_t SML_ESCAPE = 0x1b;
-   static const uint8_t SML_VERSION1 = 0x01;
-
    static const uint8_t SML_MORE_FLAG = 0x80;
    static const uint8_t SML_TAG_MASK = 0x70;
    static const uint8_t SML_LENGTH_MASK = 0x0F;
@@ -101,6 +93,7 @@ protected:
    // https://www.promotic.eu/en/pmdoc/Subsystems/Comm/PmDrivers/IEC62056_OBIS.htm
    // https://www.bundesnetzagentur.de/DE/Service-Funktionen/Beschlusskammern/BK06/BK6_81_GPKE_GeLi/Mitteilung_Nr_20/Anlagen/Obis-Kennzahlen-System_2.0.pdf?__blob=publicationFile&v=2
    // ----------------------------------------------------------------------------
+   static const uint8_t OBIS_TARIFF = 0;
    static const uint8_t OBIS_INSTANTANEOUS_POWER_TYPE = 7;
    static const uint8_t OBIS_ENERGY_TYPE = 8;
    static const uint8_t OBIS_POSITIVE_ACTIVE_POWER = 1;
@@ -127,7 +120,7 @@ protected:
     */
    bool parseMessageBody(int pos) {
       getLength(pos);            // Skip list identifier of message
-      uint16_t message = (uint16_t)getNextValue(pos);
+      uint16_t message = (uint16_t)getNextIntValue(pos);
       if (message != SML_GET_LIST_RES) {
          return false;
       }
@@ -142,13 +135,13 @@ protected:
          uint8_t tariff = _pPacket[pos++];
          ++pos;                  // Skip next value
          getNextElement(pos, 2);  // Skip status and timestamp
-         getNextValue(pos);      // Skip unit
-         int8_t scale = (int8_t)getNextValue(pos);
-         int64_t value = (int64_t)getNextValue(pos);
+         getNextIntValue(pos);      // Skip unit
+         int8_t scale = (int8_t)getNextIntValue(pos);
+         int64_t value = (int64_t)getNextIntValue(pos);
          getNextElement(pos);    // Skip signature
 
          // Store the value in fields
-         if ((tariff == 0) && (scale >= SML_MIN_SCALE) && (scale <= SML_MAX_SCALE)) {
+         if ((tariff == OBIS_TARIFF) && (scale >= SML_MIN_SCALE) && (scale <= SML_MAX_SCALE)) {
             value *= SCALE_FACTORS[scale - SML_MIN_SCALE];
             switch (type) {
             case OBIS_INSTANTANEOUS_POWER_TYPE:
@@ -234,12 +227,12 @@ protected:
    }
 
    /**
-    * @brief Get the next value
+    * @brief Get the next integer value (supports both, uint and int types)
     * @param pos  Position in the packet (will be updated!)
     * @return The value as uint64
     * @note This function returns 0 if the element-type is invalid
     */
-   int64_t getNextValue(int &pos) {
+   int64_t getNextIntValue(int &pos) {
       uint8_t elementType = getType(pos);
       uint16_t elementLength = getLength(pos);
       int64_t value = 0UL;
@@ -250,27 +243,10 @@ protected:
          }
       }
       else {
-         pos += elementLength;
+         pos += elementLength - 1;
       }
       return value;
    }
-
-   /**
-    * @brief Check whether the given mark is available
-    * @param pos  Position in the packet (will be updated!)
-    * @param value Value to check
-    * @param count Number of repeating values
-    * @return true if the mark is found
-    */
-   bool checkMark(int &pos, uint8_t value, int count = 4) {
-      for (int i = 0; i < count; ++i) {
-         if (_pPacket[pos++] != value) {
-            return false;
-         }
-      }
-      return true;
-   }
-
 };
 
 // Scale factors                                                       -2  -1    0     1      2       3        4         5

@@ -54,7 +54,7 @@ public:
       SmlParser::_packetLength = 100;
       int pos = 0;
 
-      int64_t value = getNextValue(pos);
+      int64_t value = getNextIntValue(pos);
 
       printf("%s: Value expected %ld, got %ld\n",
              expected == value ? "OK" : "ERROR",
@@ -92,7 +92,7 @@ private:
 };
 
 int checkResult(uint32_t powerInW, uint32_t powerOutW, uint64_t energyWh, uint32_t ok, uint32_t errors) {
-   smlParser.parsePacket(smlPacket, SML_TEST_PACKET_LENGTH);
+   smlParser.parsePacket(smlPacket + 8, SML_TEST_PACKET_LENGTH - 8);
 
    bool testOk = (smlParser.getPowerInW() == powerInW) &&
          (smlParser.getPowerOutW() == powerOutW) &&
@@ -122,27 +122,15 @@ int main(int argc, char **argv) {
 
    failed += checkResult(18554U,0U,25213320UL,1U,0U);
 
-   smlPacket[0] ^= 0xff;
-   failed += checkResult(18554U,0U,25213320UL,1U,1U);
-   smlPacket[0] ^= 0xff;
-
-   smlPacket[4] ^= 0xff;
-   failed += checkResult(18554U,0U,25213320UL,1U,2U);
-   smlPacket[4] ^= 0xff;
-
-   smlPacket[5] ^= 0xff;
-   failed += checkResult(18554U,0U,25213320UL,1U,3U);
-   smlPacket[5] ^= 0xff;
-
    smlPacket[30] ^= 0xff;
-   failed += checkResult(18554U,0U,25213320UL,1U,4U);
+   failed += checkResult(18554U,0U,25213320UL,1U,1U);
    smlPacket[30] ^= 0xff;
 
    smlPacket[212] = 0xc8; // Value
    smlPacket[213] = 0x7a; // Value
    smlPacket[218] = 0xbd; // Checksum 1
    smlPacket[219] = 0x70; // Checksum 2
-   failed += checkResult(0U,14214U,25213320UL,2U,4U);
+   failed += checkResult(0U,14214U,25213320UL,2U,1U);
 
    if (failed == 0) {
       printf("ALL TESTS PASSED.\n");
