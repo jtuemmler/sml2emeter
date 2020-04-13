@@ -19,6 +19,7 @@
 #include <WiFiUDP.h>
 #include <PubSubClient.h>
 #include "util/sml_testpacket.h"
+#include "smlstreamreader.h"
 #include "smlparser.h"
 #include "emeterpacket.h"
 
@@ -35,7 +36,7 @@ const int SERIAL_TIMEOUT_MS = 100;
 // Use demo data
 //  Set to false, to read data from serial port or to
 //  true: Use build-in demo data
-const bool USE_DEMO_DATA = false;
+const bool USE_DEMO_DATA = true;
 
 // Time to wait for demo-data
 const int TEST_PACKET_RECEIVE_TIME_MS = SERIAL_TIMEOUT_MS + SML_TEST_PACKET_LENGTH / 12;
@@ -80,6 +81,9 @@ const char INDEX_HTML[] = "<!doctypehtml><meta charset=utf-8><meta content=\"wid
 // Buffer for serial reading
 const int SML_PACKET_SIZE = 1000;
 uint8_t smlPacket[SML_PACKET_SIZE];
+
+// Reader for SML streams
+SmlStreamReader smlStreamReader;
 
 // Parser for SML packets
 SmlParser smlParser;
@@ -464,7 +468,7 @@ void publishEmeter(int smlPacketLength) {
             Udp.write(emeterPacket.getData(), emeterPacket.getLength());
          }
          else {
-            Udp.write(smlPacket, smlPacketLength);
+            Udp.write(smlStreamReader.getData(), smlStreamReader.getLength());
          }
 
          // Send paket
@@ -522,19 +526,25 @@ void loop() {
 
    // Send the packet if a valid telegram was received
    if (smlPacketLength <= SML_PACKET_SIZE) {
-      if (smlParser.parsePacket(smlPacket, smlPacketLength)) {
-         publishEmeter(smlPacketLength);
-         publishMqtt();
-      }
-      else {
-         Serial.print("E");
-      }
-      // Debugging
-      if (SML_PORT > 0) {
-         Udp.beginPacket(SML_ADDRESS, SML_PORT);
-         Udp.write(smlPacket, smlPacketLength);
-         Udp.endPacket();
-      }
+      int offset = 0;
+      do {
+         offset = smlStreamReader.addData(smlPacket + offset, smlPacketLength - offset);
+         if (offset >= 0) {
+            if (smlParser.parsePacket(smlStreamReader.getData(), smlStreamReader.getLength())) {
+               publishEmeter(smlPacketLength);
+               publishMqtt();
+            }
+            else {
+               Serial.print("E");
+            }
+            // Debugging
+            if (SML_PORT > 0) {
+               Udp.beginPacket(SML_ADDRESS, SML_PORT);
+               Udp.write(smlStreamReader.getData(), smlStreamReader.getLength());
+               Udp.endPacket();
+            }
+         }
+      } while (offset >= 0);
    }
    else {
       // Overflow error
