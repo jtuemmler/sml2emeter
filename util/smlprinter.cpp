@@ -4,6 +4,7 @@
 #include <inttypes.h>
 
 #include "sml_testpacket.h"
+#include "sml_demodata.h"
 
 uint8_t* getOctetString(uint8_t *pBuffer, int *pBufferSize, uint8_t *pPacket, const int length) {
    ++pPacket;
@@ -139,6 +140,6 @@ void parseSml(uint8_t* pPacket) {
 }
 
 int main(int argc, char** argv) {
-   parseSml((uint8_t*)SML_TEST_PACKET);
+   parseSml((uint8_t*)SML_DATA[1].data);
    return 0;
 }

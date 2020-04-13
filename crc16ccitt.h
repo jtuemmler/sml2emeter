@@ -57,6 +57,10 @@ public:
       return ((_u16Crc & LO_BYTE_MASK) << 8 | ((_u16Crc & HI_BYTE_MASK) >> 8)) ^ INIT_FCS;
    }
 
+   inline uint16_t getCrcState() {
+      return _u16Crc;
+   }
+
 private:
    /// Size of the CRC table
    static const uint16_t _u16CrcTableSize = 256;

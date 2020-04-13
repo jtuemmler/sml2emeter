@@ -40,6 +40,13 @@ add_executable(testsmlparser
    util/sml_testpacket.h
 )
 
+add_executable(testsmlreader
+	util/smlreadertest.cpp
+	smlstreamreader.h
+	smlparser.h
+	util/sml_demodata.h
+)
+
 if(WIN32)
    target_link_libraries(sml2emeter wsock32)
 endif(WIN32)
