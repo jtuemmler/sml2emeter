@@ -94,7 +94,7 @@ int SerialImpl::readBytes(byte *pBuffer, int bufferSize) {
    int timeout = _timeout;
    while ((timeout > 0) && (bufferSize > 0)) {
       if (available()) {
-         int bytesRead = read(_fd, (void*)(pBuffer + length), bufferSize);
+         int bytesRead = ::read(_fd, (void*)(pBuffer + length), bufferSize);
          bufferSize -= bytesRead;
          length += bytesRead;
          timeout = _timeout;
@@ -118,7 +118,7 @@ int SerialImpl::read()
 #ifndef _WIN32
    if (available()) {
       uint8_t data;
-      int bytesRead = read(_fd, (void*)&data, 1);
+      size_t bytesRead = ::read(_fd, (void*)&data, 1);
       if (bytesRead == 1) {
          return data;
       }

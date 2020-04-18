@@ -1,8 +1,23 @@
+#!/usr/bin/python3
 import serial
 import sys
 
+#
+# Script to test sml2emeter without a real energy meter
+#
+# To test with a nodemcu on windows use:
+# python emetersim.py COM4
+#
+# Where COM4 is the serial port of the nodemcu.
+#
+# To test the linux version with a virtual com-port use:
+# socat -d -d -v pty,raw,echo=0,link=./reader pty,raw,echo=0,link=./writer
+# sml2emeter reader
+# python3 emetersim.py writer 0 1
+#
+
 if (len(sys.argv) == 1):
-	print('Usage: {} [COM-Port] {{[enable-error-message]}}'.format(sys.argv[0]))
+	print('Usage: {} [COM-Port] {{[enable-error-message]}} {{[use-rtscts]}}'.format(sys.argv[0]))
 	quit()
 
 smlData = [
@@ -27,7 +42,13 @@ smlData = [
 	['ETOc  ', '']
 ]
 
-ENABLE_ERROR_MESSAGES = len(sys.argv) > 2
+ENABLE_ERROR_MESSAGES = False
+if (len(sys.argv) > 2):
+	ENABLE_ERROR_MESSAGES = (sys.argv[2] == '1')
+
+RTSCTS = False
+if (len(sys.argv) > 3):
+	RTSCTS = (sys.argv[3] == '1')
 
 if (not(ENABLE_ERROR_MESSAGES)):
 	del smlData[4:]
@@ -35,7 +56,7 @@ if (not(ENABLE_ERROR_MESSAGES)):
 for i in range(len(smlData)):
 	smlData[i][1] = bytearray.fromhex(smlData[i][1])
 
-with serial.Serial(sys.argv[1], timeout=1) as ser:
+with serial.Serial(sys.argv[1], timeout=1, rtscts=RTSCTS, dsrdtr=RTSCTS) as ser:
 	index = 0
 
 	while True:
