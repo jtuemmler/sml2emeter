@@ -44,7 +44,7 @@ int testDataPacket(SmlStreamReader &reader, int length) {
 }
 
 int main(int argc, char ** argv) {
-   SmlStreamReader reader;
+   SmlStreamReader reader(500);
    SmlParser parser;
 
    printInfo(reader, testSmlTestPacket(reader));

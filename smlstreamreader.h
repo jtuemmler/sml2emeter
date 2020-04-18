@@ -7,7 +7,19 @@
 
 class SmlStreamReader {
 public:
-   SmlStreamReader() : _currentState(&SmlStreamReader::stateReadData), _escLen(0), _escData(0U), _packetPos(0) {}
+   SmlStreamReader(int maxPacketSize) : 
+      _currentState(&SmlStreamReader::stateReadData),
+      _maxPacketSize(maxPacketSize),
+      _escLen(0), 
+      _escData(0U), 
+      _packetPos(0) 
+   {
+      _data = new uint8_t[_maxPacketSize];
+   }
+
+   ~SmlStreamReader() {
+      delete[] _data;
+   }
 
    inline const uint8_t *getData() {
       return _data;
@@ -40,7 +52,6 @@ private:
    static const uint32_t SML_END_MASK = 0xff000000;
    static const uint32_t SML_SPARE_MASK = 0x00ff0000;
    static const uint32_t SML_CRC_MASK = 0x0000ffff;
-   static const int MAX_PACKET_SIZE = 500;
 
    void startPacket() {
       _packetPos = 0;
@@ -49,7 +60,7 @@ private:
    }
 
    bool stateReadData(uint8_t currentByte) {
-      if (_packetPos >= MAX_PACKET_SIZE) {
+      if (_packetPos >= _maxPacketSize) {
          startPacket();
       }
       _data[_packetPos++] = currentByte;
@@ -94,12 +105,13 @@ private:
    }
 
    bool(SmlStreamReader::*_currentState)(uint8_t);
+   int _maxPacketSize;
    int _escLen;
    uint32_t _escData;
    int _packetPos;
    int _packetLength;
    uint16_t _crc16;
-   uint8_t _data[MAX_PACKET_SIZE];
+   uint8_t *_data;
    Crc16Ccitt crc16;
 };
 

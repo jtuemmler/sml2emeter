@@ -1,7 +1,7 @@
 /**
 * ESP8266 SML to SMA energy meter converter
 *
-* ﻿This sketch may be used to read SML telegrams from an infrared D0 interface, convert it to SMA energy-meter
+* ﻿This sketch reads SML telegrams from an infrared D0 interface, converts them to SMA energy-meter
 * telegrams and send it via UDP.
 *
 * Dependencies:
@@ -30,16 +30,13 @@
 // Application version
 const char VERSION[] = "Version 1.4";
 
-// Timeout for reading SML packets
-const int SERIAL_TIMEOUT_MS = 100;
-
 // Use demo data
 //  Set to false, to read data from serial port or to
 //  true: Use build-in demo data
-const bool USE_DEMO_DATA = true;
+const bool USE_DEMO_DATA = false;
 
 // Time to wait for demo-data
-const int TEST_PACKET_RECEIVE_TIME_MS = SERIAL_TIMEOUT_MS + SML_TEST_PACKET_LENGTH / 12;
+const int TEST_PACKET_RECEIVE_TIME_MS = (SML_TEST_PACKET_LENGTH * 8 * 1000) / 9600;
 
 // Default multicast address for energy meter packets
 const IPAddress MCAST_ADDRESS = IPAddress(239, 12, 255, 254);
@@ -80,10 +77,9 @@ const char INDEX_HTML[] = "<!doctypehtml><meta charset=utf-8><meta content=\"wid
 
 // Buffer for serial reading
 const int SML_PACKET_SIZE = 1000;
-uint8_t smlPacket[SML_PACKET_SIZE];
 
 // Reader for SML streams
-SmlStreamReader smlStreamReader;
+SmlStreamReader smlStreamReader(SML_PACKET_SIZE);
 
 // Parser for SML packets
 SmlParser smlParser;
@@ -227,48 +223,52 @@ void updateEmeterPacket() {
 /**
 * @brief Read next packet from the serial interface
 */
-int readSerial() {
-   // Wait until something is received
+void readSerial() {
    Serial.print("W");
    ledOff();
-   int flashcount = 0;
-   while (!Serial.available()) {
-      flashcount++;
-      if (flashcount == 390) {
-         ledOn();
+   bool receiving = false;
+   int waitCount = 0;
+   do {
+      int data = Serial.read();
+      if (data >= 0) {
+         if (!receiving) {
+            Serial.print("r");
+            ledOn();
+            receiving = true;
+         }
+         uint8_t byte = (uint8_t)data;
+         if (smlStreamReader.addData(&byte, 1) >= 0) {
+            break;
+         }
       }
-      else if (flashcount > 400) {
-         ledOff();
-         flashcount = 0;
-         ++readErrors;
+      else {
+         ++waitCount;
+         if (waitCount == 195) {
+            ledOn();
+         }
+         if (waitCount == 200) {
+            ledOff();
+            waitCount = 0;
+            ++readErrors;
+         }
+         delayMs(10);
       }
-      delayMs(5);
-   }
-
-   // We got some bytes. Read until next pause
-   Serial.print("R");
-   ledOn();
-   Serial.setTimeout(SERIAL_TIMEOUT_MS);
-   int serialLen = Serial.readBytes(smlPacket, SML_PACKET_SIZE);
+   } while (true);
    ledOff();
-   return serialLen;
 }
 
 /**
 * @brief Read test packet
 */
-int readTestPacket() {
+void readTestPacket() {
    Serial.print("w");
    ledOff();
-   for (int i = 0; i < 1000 - TEST_PACKET_RECEIVE_TIME_MS; i += 5) {
-      delayMs(5);
-   }
+   delayMs(1000 - TEST_PACKET_RECEIVE_TIME_MS);
    Serial.print("r");
    ledOn();
    delay(TEST_PACKET_RECEIVE_TIME_MS);
-   memcpy(smlPacket, SML_TEST_PACKET, SML_TEST_PACKET_LENGTH);
+   smlStreamReader.addData(SML_TEST_PACKET, SML_TEST_PACKET_LENGTH);
    ledOff();
-   return SML_TEST_PACKET_LENGTH;
 }
 
 /**
@@ -451,7 +451,7 @@ void setup() {
  * @brief Publish data for emeter-protocol
  * @param smlPacketLength length of the SML packet
  */
-void publishEmeter(int smlPacketLength) {
+void publishEmeter() {
    if (port > 0) {
       updateEmeterPacket();
       int i = 0;
@@ -516,40 +516,27 @@ void loop() {
    Serial.print("_");
 
    // Read the next packet
-   int smlPacketLength;
    if (!USE_DEMO_DATA) {
-      smlPacketLength = readSerial();
+      readSerial();
    }
    else {
-      smlPacketLength = readTestPacket();
+      readTestPacket();
    }
 
-   // Send the packet if a valid telegram was received
-   if (smlPacketLength <= SML_PACKET_SIZE) {
-      int offset = 0;
-      do {
-         offset = smlStreamReader.addData(smlPacket + offset, smlPacketLength - offset);
-         if (offset >= 0) {
-            if (smlParser.parsePacket(smlStreamReader.getData(), smlStreamReader.getLength())) {
-               publishEmeter(smlPacketLength);
-               publishMqtt();
-            }
-            else {
-               Serial.print("E");
-            }
-            // Debugging
-            if (SML_PORT > 0) {
-               Udp.beginPacket(SML_ADDRESS, SML_PORT);
-               Udp.write(smlStreamReader.getData(), smlStreamReader.getLength());
-               Udp.endPacket();
-            }
-         }
-      } while (offset >= 0);
+   // Send the packet
+   if (smlParser.parsePacket(smlStreamReader.getData(), smlStreamReader.getLength())) {
+      publishEmeter();
+      publishMqtt();
    }
    else {
-      // Overflow error
-      Serial.print("O");
-      ++readErrors;
+      Serial.print("E");
+   }
+   
+   // Debugging
+   if (SML_PORT > 0) {
+      Udp.beginPacket(SML_ADDRESS, SML_PORT);
+      Udp.write(smlStreamReader.getData(), smlStreamReader.getLength());
+      Udp.endPacket();
    }
    Serial.println(".");
 }
