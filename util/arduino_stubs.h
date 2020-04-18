@@ -110,6 +110,7 @@ public:
       _pFileName = NULL;
       _timeout = 1000;
       _fd = -1;
+      _testDataPos = 0;
    }
    ~SerialImpl();
    void print(const char* msg) {
@@ -133,11 +134,13 @@ public:
    bool available();
    void begin(int baud);
    int readBytes(byte *pBuffer, int bufferSize);
+   int read();
    operator bool() const { return true; }
 private:
    const char* _pFileName;
    int _timeout;
    int _fd;
+   int _testDataPos;
 };
 
 // ----------------------------------------------------------------------------

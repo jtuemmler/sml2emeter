@@ -108,6 +108,25 @@ int SerialImpl::readBytes(byte *pBuffer, int bufferSize) {
    return length;
 }
 
+int SerialImpl::read()
+{
+   if (_fd < 0) {
+      int data = SML_TEST_PACKET[_testDataPos];
+      _testDataPos = (_testDataPos + 1) % SML_TEST_PACKET_LENGTH;
+      return data;
+   }
+#ifndef _WIN32
+   if (available()) {
+      uint8_t data;
+      int bytesRead = read(_fd, (void*)&data, 1);
+      if (bytesRead == 1) {
+         return data;
+      }
+   }
+#endif
+   return -1;
+}
+
 #ifndef _WIN32
 char *itoa(int value, char *str, int base)
 {
