@@ -15,6 +15,7 @@ add_executable(smlprinter
 
 add_executable(sml2emeter
    sml2emeter.ino
+   smlstreamreader.h
    smlparser.h
    crc16ccitt.h
    emeterpacket.h
@@ -34,6 +35,7 @@ if(NOT MSVC)
 endif(NOT MSVC)
 
 add_executable(testsmlparser
+   smlstreamreader.h
    smlparser.h
    crc16ccitt.h
    util/smlparsertest.cpp
@@ -41,9 +43,9 @@ add_executable(testsmlparser
 )
 
 add_executable(testsmlreader
-	util/smlreadertest.cpp
 	smlstreamreader.h
 	smlparser.h
+	util/smlreadertest.cpp
 	util/sml_demodata.h
 )
 

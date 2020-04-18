@@ -232,9 +232,10 @@ void readSerial() {
       int data = Serial.read();
       if (data >= 0) {
          if (!receiving) {
-            Serial.print("r");
+            Serial.print("R");
             ledOn();
             receiving = true;
+            waitCount = 0;
          }
          uint8_t byte = (uint8_t)data;
          if (smlStreamReader.addData(&byte, 1) >= 0) {
@@ -247,6 +248,7 @@ void readSerial() {
             ledOn();
          }
          if (waitCount == 200) {
+            Serial.print("T");
             ledOff();
             waitCount = 0;
             ++readErrors;
@@ -261,10 +263,10 @@ void readSerial() {
 * @brief Read test packet
 */
 void readTestPacket() {
-   Serial.print("w");
+   Serial.print("W");
    ledOff();
    delayMs(1000 - TEST_PACKET_RECEIVE_TIME_MS);
-   Serial.print("r");
+   Serial.print("R");
    ledOn();
    delay(TEST_PACKET_RECEIVE_TIME_MS);
    smlStreamReader.addData(SML_TEST_PACKET, SML_TEST_PACKET_LENGTH);
@@ -312,7 +314,7 @@ String getCurrentDataAsJson(bool detailed = true) {
       data += ",\"ReadErrors\":";
       data += (unsigned int)readErrors;
       data += ",\"ParseErrors\":";
-      data += (unsigned int)smlParser.getParseErrors();
+      data += (unsigned int)(smlParser.getParseErrors() + smlStreamReader.getParseErrors());
    }
    data += "}";
 

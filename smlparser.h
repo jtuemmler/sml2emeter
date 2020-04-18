@@ -54,6 +54,7 @@ public:
             ++pos;
          }
          else {
+            //printf("Parser: Warning %04x != %04x\n", crc16Expected, _crc16.getCrc());
             ++_parseErrors;
             return false;
             break;

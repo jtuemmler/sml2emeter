@@ -12,6 +12,7 @@ public:
       _maxPacketSize(maxPacketSize),
       _escLen(0), 
       _escData(0U), 
+      _parseErrors(0U),
       _packetPos(0) 
    {
       _data = new uint8_t[_maxPacketSize];
@@ -21,21 +22,17 @@ public:
       delete[] _data;
    }
 
-   inline const uint8_t *getData() {
-      return _data;
-   }
+   inline const uint8_t *getData() { return _data; }
 
-   inline int getLength() {
-      return _packetLength;
-   }
+   inline int getLength() { return _packetLength; }
 
-   inline uint16_t getCrc16() {
-      return _crc16;
-   }
+   inline uint16_t getCrc16() { return _crc16Expected; }
+
+   inline uint32_t getParseErrors() const { return _parseErrors; }
 
    int addData(const uint8_t *pData, int length) {
       for (int i = 0; i < length; ++i) {
-         crc16.calc(pData[i]);
+         _crc16.calc(pData[i]);
          if ((this->*_currentState)(pData[i])) {
             return i + 1;
          }
@@ -53,14 +50,26 @@ private:
    static const uint32_t SML_SPARE_MASK = 0x00ff0000;
    static const uint32_t SML_CRC_MASK = 0x0000ffff;
 
+   bool(SmlStreamReader::*_currentState)(uint8_t);
+   int _maxPacketSize;
+   int _escLen;
+   uint32_t _escData;
+   uint32_t _parseErrors;
+   int _packetPos;
+   int _packetLength;
+   uint16_t _crc16Expected;
+   uint8_t *_data;
+   Crc16Ccitt _crc16;
+
    void startPacket() {
       _packetPos = 0;
       _escLen = 0;
-      crc16.init(0x91dc);
+      _crc16.init(0x91dc);
    }
 
    bool stateReadData(uint8_t currentByte) {
       if (_packetPos >= _maxPacketSize) {
+         ++_parseErrors;
          startPacket();
       }
       _data[_packetPos++] = currentByte;
@@ -68,7 +77,7 @@ private:
          if (++_escLen == 4) {
             _packetPos -= 4;
             _currentState = &SmlStreamReader::stateReadEsc;
-            _crc16 = crc16.getCrcState();
+            _crc16Expected = _crc16.getCrcState();
          }
       }
       else {
@@ -90,12 +99,13 @@ private:
          if ((_escData & SML_END_MASK) == SML_END) {
             int spareBytes = ((_escData & SML_SPARE_MASK) >> 16);
             _packetLength = _packetPos - spareBytes;
-            crc16.init(_crc16);
-            crc16.calc(0x1a);
-            crc16.calc(spareBytes);
-            _crc16 = _escData & SML_CRC_MASK;
-            if (_crc16 != crc16.getCrc()) {
-               printf("Warning %04x != %04x\n", _crc16, crc16.getCrc());
+            _crc16.init(_crc16Expected);
+            _crc16.calc(0x1a);
+            _crc16.calc(spareBytes);
+            _crc16Expected = _escData & SML_CRC_MASK;
+            if (_crc16Expected != _crc16.getCrc()) {
+               //printf("Reader: Warning %04x != %04x\n", _crc16Expected, crc16.getCrc());
+               ++_parseErrors;
                return false;
             }
             return true;
@@ -103,17 +113,6 @@ private:
       }
       return false;
    }
-
-   bool(SmlStreamReader::*_currentState)(uint8_t);
-   int _maxPacketSize;
-   int _escLen;
-   uint32_t _escData;
-   int _packetPos;
-   int _packetLength;
-   uint16_t _crc16;
-   uint8_t *_data;
-   Crc16Ccitt crc16;
 };
-
 
 #endif
