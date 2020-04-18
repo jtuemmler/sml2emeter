@@ -90,6 +90,9 @@ EmeterPacket emeterPacket;
 // Errors while reading packets from the serial interface
 uint32_t readErrors = 0;
 
+// Errors while reading packets from the serial interface
+uint32_t mqttSendErrors = 0;
+
 // Counter for failed wifi connection attempts
 int failedWifiConnections = 0;
 
@@ -315,6 +318,12 @@ String getCurrentDataAsJson(bool detailed = true) {
       data += (unsigned int)readErrors;
       data += ",\"ParseErrors\":";
       data += (unsigned int)(smlParser.getParseErrors() + smlStreamReader.getParseErrors());
+      if (mqttPort > 0) {
+         data += ",\"MqttClientState\":";
+         data += mqttClient.state();
+         data += ",\"MqttSendErrors\":";
+         data += (unsigned int)mqttSendErrors;
+      }
    }
    data += "}";
 
@@ -498,6 +507,7 @@ void publishMqtt() {
       if (!mqttClient.connect(iotWebConf.getThingName())) {
          Serial.print("F");
          Serial.print(mqttClient.state());
+         ++mqttSendErrors;
          return;
       }
       Serial.print("C");
@@ -510,6 +520,7 @@ void publishMqtt() {
    else {
       Serial.print("E");
       Serial.print(mqttClient.state());
+      ++mqttSendErrors;
    }
 }
 
