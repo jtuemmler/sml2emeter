@@ -489,23 +489,25 @@ void publishMqtt() {
    Serial.print("M");
 
    if (!mqttClient.connected()) {
-      if (--mqttRetryCounter <= 0) {
-         mqttRetryCounter = 60;
-         if (!mqttClient.connect("sml2emeter")) {
-            Serial.print("F");
-            Serial.print(mqttClient.state());
-            return;
-         }
-         Serial.print("C");
+      if (--mqttRetryCounter > 0) {
+         return;
       }
+      mqttRetryCounter = 60;
+      if (!mqttClient.connect(iotWebConf.getThingName())) {
+         Serial.print("F");
+         Serial.print(mqttClient.state());
+         return;
+      }
+      Serial.print("C");
    }
 
    mqttClient.loop();
-   if (mqttClient.publish(mqttTopic.c_str(), getCurrentDataAsJson(false).c_str()) == 0) {
+   if (mqttClient.publish(mqttTopic.c_str(), getCurrentDataAsJson(false).c_str())) {
       Serial.print("S");
    }
    else {
       Serial.print("E");
+      Serial.print(mqttClient.state());
    }
 }
 
