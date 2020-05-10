@@ -28,7 +28,7 @@
 // ----------------------------------------------------------------------------
 
 // Application version
-const char VERSION[] = "Version 1.4";
+const char VERSION[] = "Version 1.5.B";
 
 // Use demo data
 //  Set to false, to read data from serial port or to
@@ -47,6 +47,12 @@ const uint16_t DESTINATION_PORT = 9522;
 // Debugging (set SML_PORT = 0 to disable)
 const IPAddress SML_ADDRESS = IPAddress(192, 168, 2, 100);
 const uint16_t SML_PORT = 0;
+
+// PIN for pulse-counting
+const int PULSE_INPUT_PIN = D1;
+
+// Timeout of updates of the pulse-counter
+const unsigned long MQTT_PULSE_UPDATE_TIMEOUT_MS = 60000UL;
 
 // ----------------------------------------------------------------------------
 // Constants for IotWebConf
@@ -102,6 +108,18 @@ bool ledState = false;
 // Time to change the state of the led
 unsigned long nextLedChange = 0;
 
+// Timeout for pulse-counting
+unsigned long pulseTimeoutMs = 0;
+
+// Counted impulses
+unsigned long impulses = 0UL;
+
+// Time (ticks) of the last received impulse
+unsigned long lastPulseEventMs = 0UL;
+
+// Time (ticks) of the next update for pulse-counter
+unsigned long mqttLastPulseUpdateMs = 0UL;
+
 // Destination addresses for sending meter packets
 const int DEST_ADRESSES_SIZE = 2;
 IPAddress destAddresses[DEST_ADRESSES_SIZE];
@@ -126,6 +144,7 @@ HTTPUpdateServer httpUpdater;
 WiFiClient wifiClient;
 PubSubClient mqttClient(wifiClient);
 String mqttTopic;
+String mqttTopicImpulses;
 int mqttPort = 0;
 int mqttRetryCounter = 0;
 
@@ -139,6 +158,7 @@ char serialNumberValue[NUMBER_LEN] = "";
 char portValue[NUMBER_LEN] = "";
 char mqttBrockerAddressValue[NUMBER_LEN] = "";
 char mqttPortValue[NUMBER_LEN] = "0";
+char pulseTimeoutMsValue[NUMBER_LEN] = "0";
 
 IotWebConfSeparator separator1("Meter configuration");
 IotWebConfParameter serialNumberParam("Serial number", "serialNumber", serialNumberValue, NUMBER_LEN, "number", serialNumberValue, serialNumberValue, "min='0' max='999999999' step='1'");
@@ -149,6 +169,9 @@ IotWebConfParameter portParam("Port (default 9522)", "port", portValue, NUMBER_L
 IotWebConfSeparator separator2("MQTT broker configuration");
 IotWebConfParameter mqttBrockerAddressParam("Hostname", "mqttBrockerAddress", mqttBrockerAddressValue, STRING_LEN, "");
 IotWebConfParameter mqttPortParam("Port (default 1883)", "mqttPort", mqttPortValue, NUMBER_LEN, "number", mqttPortValue, mqttPortValue, "min='0' max='65535' step='1'");
+
+IotWebConfSeparator separator3("Pulse counting");
+IotWebConfParameter pulseTimeoutMsParam("Timeout for pulse-counter (ms)", "pulseTimeoutMs", pulseTimeoutMsValue, NUMBER_LEN, "number", pulseTimeoutMsValue, pulseTimeoutMsValue, "min='0' max='100000' step='1'");
 
 /**
 * @brief Turn status led on
@@ -163,8 +186,21 @@ void ledOn(bool overrideComState = false) {
 * @brief Turn status led off
 */
 void ledOff(bool overrideComState = false) {
-   if ((iotWebConf.getState() == IOTWEBCONF_STATE_ONLINE) || overrideComState) {
+   if (((iotWebConf.getState() == IOTWEBCONF_STATE_ONLINE) && (nextLedChange == 0)) || overrideComState) {
       digitalWrite(LED_BUILTIN, HIGH);
+   }
+}
+
+/**
+* @brief Turn led for given time on
+*/
+void ledOnFor(unsigned int ledTimeoutMs) {
+   if (iotWebConf.getState() == IOTWEBCONF_STATE_ONLINE) {
+      ledOn();
+      nextLedChange = millis() + ledTimeoutMs;
+      if (nextLedChange == 0) {
+         nextLedChange = 1;
+      }
    }
 }
 
@@ -174,6 +210,10 @@ void ledOff(bool overrideComState = false) {
 void signalConnectionState() {
    if (iotWebConf.getState() == IOTWEBCONF_STATE_ONLINE) {
       failedWifiConnections = 0;
+      if ((nextLedChange > 0) && (millis() > nextLedChange)) {
+         nextLedChange = 0;
+         ledOff();
+      }
       return;
    }
 
@@ -201,6 +241,22 @@ void delayMs(unsigned long delayMs) {
       iotWebConf.doLoop();
       signalConnectionState();
       delay(1);
+   }
+}
+
+/**
+ * @brief Handle interrupt from pulse-counter
+ */
+ICACHE_RAM_ATTR void handlePulseInterrupt() {
+   if (pulseTimeoutMs > 0) {
+      Serial.print("h");
+      unsigned long currentTimeMs = millis();
+      if (((currentTimeMs - lastPulseEventMs) > pulseTimeoutMs) || (currentTimeMs < lastPulseEventMs)) {
+         ledOnFor(2000);
+         impulses++;
+         Serial.print("i" + String(impulses));
+      }
+      lastPulseEventMs = currentTimeMs;
    }
 }
 
@@ -236,7 +292,7 @@ void readSerial() {
       if (data >= 0) {
          if (!receiving) {
             Serial.print("R");
-            ledOn();
+            ledOnFor(500);
             receiving = true;
             waitCount = 0;
          }
@@ -259,7 +315,6 @@ void readSerial() {
          delayMs(10);
       }
    } while (true);
-   ledOff();
 }
 
 /**
@@ -268,12 +323,11 @@ void readSerial() {
 void readTestPacket() {
    Serial.print("W");
    ledOff();
-   delayMs(1000 - TEST_PACKET_RECEIVE_TIME_MS);
+   ledOnFor(1000 - TEST_PACKET_RECEIVE_TIME_MS);
    Serial.print("R");
    ledOn();
    delay(TEST_PACKET_RECEIVE_TIME_MS);
    smlStreamReader.addData(SML_TEST_PACKET, SML_TEST_PACKET_LENGTH);
-   ledOff();
 }
 
 /**
@@ -323,6 +377,10 @@ String getCurrentDataAsJson(bool detailed = true) {
          data += mqttClient.state();
          data += ",\"MqttSendErrors\":";
          data += (unsigned int)mqttSendErrors;
+      }
+      if (pulseTimeoutMs > 0) {
+         data += ",\"Impulses\":";
+         data += impulses;
       }
    }
    data += "}";
@@ -386,11 +444,21 @@ void configSaved() {
    mqttClient.disconnect();
    mqttPort = mqttBrockerAddressValue[0] == 0 ? 0 : atoi(mqttPortValue);
    if (mqttPort > 0) {
-      mqttTopic = "/";
-      mqttTopic += iotWebConf.getThingName();
-      mqttTopic += "/data";
+      mqttTopic = String("/") + iotWebConf.getThingName() + String("/data");
+      mqttTopicImpulses = String("/") + iotWebConf.getThingName() + String("/impulses");
+      
       Serial.print("mqttTopic: "); Serial.println(mqttTopic);
       mqttClient.setServer(mqttBrockerAddressValue, mqttPort);
+   }
+
+   pulseTimeoutMs = pulseTimeoutMsValue[0] == 0 ? 0 : atoi(pulseTimeoutMsValue);
+
+   if (pulseTimeoutMs > 0) {
+      // Attach interrupt-handler
+      attachInterrupt(PULSE_INPUT_PIN, handlePulseInterrupt, FALLING);
+   }
+   else {
+      detachInterrupt(PULSE_INPUT_PIN);
    }
 }
 
@@ -412,6 +480,7 @@ IotWebConfWifiAuthInfo* handleWifiConnectionFailed() {
 void setup() {
    // Initialize the LED_BUILTIN pin as an output
    pinMode(LED_BUILTIN, OUTPUT);
+   pinMode(PULSE_INPUT_PIN, INPUT_PULLUP);
 
    // Open serial communications and wait for port to open      
    Serial.begin(9600);
@@ -436,9 +505,14 @@ void setup() {
    iotWebConf.addParameter(&destinationAddress2Param);
    iotWebConf.addParameter(&portParam);
    iotWebConf.addParameter(&serialNumberParam);
+
    iotWebConf.addParameter(&separator2);
    iotWebConf.addParameter(&mqttBrockerAddressParam);
    iotWebConf.addParameter(&mqttPortParam);
+   
+   iotWebConf.addParameter(&separator3);
+   iotWebConf.addParameter(&pulseTimeoutMsParam);
+   
    iotWebConf.setConfigSavedCallback(&configSaved);
    iotWebConf.setFormValidator(&formValidator);
    iotWebConf.setupUpdateServer(&httpUpdater, "/update");
@@ -522,6 +596,21 @@ void publishMqtt() {
       Serial.print(mqttClient.state());
       ++mqttSendErrors;
    }
+
+   unsigned long currentTimeMs = millis();
+   
+   if ((pulseTimeoutMsValue > 0) && (currentTimeMs - mqttLastPulseUpdateMs > MQTT_PULSE_UPDATE_TIMEOUT_MS)) {
+      mqttLastPulseUpdateMs = currentTimeMs;
+      char buffer[100];
+      sprintf(buffer, "{ \"ts\" : %lu, \"ets\" : %lu, \"imp\" : %lu }", currentTimeMs, lastPulseEventMs, impulses);
+      if (mqttClient.publish(mqttTopicImpulses.c_str(), buffer)) {
+         Serial.print("I");
+      }
+      else {
+         Serial.print("E");
+         Serial.print(mqttClient.state());
+      }
+   }
 }
 
 /**
@@ -546,7 +635,7 @@ void loop() {
    else {
       Serial.print("E");
    }
-   
+
    // Debugging
    if (SML_PORT > 0) {
       Udp.beginPacket(SML_ADDRESS, SML_PORT);
