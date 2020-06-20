@@ -109,13 +109,26 @@ bool ledState = false;
 unsigned long nextLedChange = 0;
 
 // Timeout for pulse-counting
-unsigned long pulseTimeoutMs = 0;
+volatile unsigned long pulseTimeoutMs = 0;
 
 // Counted impulses
-unsigned long impulses = 0UL;
+volatile unsigned long impulses = 0UL;
+
+// Counted interrupts
+volatile unsigned long interruptCount = 0UL;
 
 // Time (ticks) of the last received impulse
-unsigned long lastPulseEventMs = 0UL;
+volatile unsigned long lastPulseEventMs = 0UL;
+
+#define MAX_EVENTS 20
+
+volatile unsigned long eventTs[MAX_EVENTS];
+volatile char eventVal[MAX_EVENTS];
+volatile int eventPos = 0;
+
+//
+int isrArmed = 0;
+int isrLastState = -2;
 
 // Time (ticks) of the next update for pulse-counter
 unsigned long mqttLastPulseUpdateMs = 0UL;
@@ -249,14 +262,30 @@ void delayMs(unsigned long delayMs) {
  */
 ICACHE_RAM_ATTR void handlePulseInterrupt() {
    if (pulseTimeoutMs > 0) {
-      Serial.print("h");
+      int state = digitalRead(PULSE_INPUT_PIN);
+      if (state == isrLastState)
+         return;
+      isrLastState = state;
+      
       unsigned long currentTimeMs = millis();
-      if (((currentTimeMs - lastPulseEventMs) > pulseTimeoutMs) || (currentTimeMs < lastPulseEventMs)) {
-         ledOnFor(2000);
-         impulses++;
-         Serial.print("i" + String(impulses));
+
+      if (eventPos < MAX_EVENTS) {
+         eventTs[eventPos] = micros();
+         eventVal[eventPos++] = state == LOW ? '0' : '1';
       }
-      lastPulseEventMs = currentTimeMs;
+            
+      if (state == LOW) {
+         lastPulseEventMs = currentTimeMs;
+         isrArmed = 1;
+      }
+      else if ((state == HIGH) && (isrArmed == 1)) {
+         isrArmed = 0;
+         if (((currentTimeMs - lastPulseEventMs) > pulseTimeoutMs) || (currentTimeMs < lastPulseEventMs)) {
+            ledOnFor(2000);
+            ++impulses;
+            Serial.print("i");
+         }
+      }
    }
 }
 
@@ -455,10 +484,17 @@ void configSaved() {
 
    if (pulseTimeoutMs > 0) {
       // Attach interrupt-handler
-      attachInterrupt(PULSE_INPUT_PIN, handlePulseInterrupt, FALLING);
+      Serial.print("Pulse-Pin: ");
+      Serial.println(PULSE_INPUT_PIN);
+      Serial.print("Interrupt: ");
+      Serial.println(digitalPinToInterrupt(PULSE_INPUT_PIN));
+      
+      attachInterrupt(digitalPinToInterrupt(PULSE_INPUT_PIN), handlePulseInterrupt, CHANGE);
+      //attachInterrupt(PULSE_INPUT_PIN, handlePulseInterrupt, FALLING);
    }
    else {
-      detachInterrupt(PULSE_INPUT_PIN);
+      detachInterrupt(digitalPinToInterrupt(PULSE_INPUT_PIN));
+      //detachInterrupt(PULSE_INPUT_PIN);
    }
 }
 
@@ -598,11 +634,35 @@ void publishMqtt() {
    }
 
    unsigned long currentTimeMs = millis();
+
+   noInterrupts();
+   unsigned long myTs[MAX_EVENTS];
+   char myVal[MAX_EVENTS];
+   int myEventPos = eventPos;
+   for (int i = 0; i < myEventPos; ++i) {
+      myTs[i] = eventTs[i];
+      myVal[i] = eventVal[i];
+   }
+   eventPos = 0;
+   interrupts();
+
+   for (int i = 0; i < myEventPos; ++i) {
+      String eventStr;
+      eventStr += eventVal[i];
+      eventStr += ":";
+      eventStr += eventTs[i];
+      //Serial.print(eventStr);
+      mqttClient.publish("debug/interrupt", eventStr.c_str());
+   }
    
    if ((pulseTimeoutMsValue > 0) && (currentTimeMs - mqttLastPulseUpdateMs > MQTT_PULSE_UPDATE_TIMEOUT_MS)) {
       mqttLastPulseUpdateMs = currentTimeMs;
+      
       char buffer[100];
-      sprintf(buffer, "{ \"ts\" : %lu, \"ets\" : %lu, \"imp\" : %lu }", currentTimeMs, lastPulseEventMs, impulses);
+      noInterrupts();
+      sprintf(buffer, "{ \"ts\" : %lu, \"ets\" : %lu, \"imp\" : %lu, \"intr\" : %lu }", currentTimeMs, lastPulseEventMs, impulses, interruptCount);
+      interrupts();
+            
       if (mqttClient.publish(mqttTopicImpulses.c_str(), buffer)) {
          Serial.print("I");
       }
