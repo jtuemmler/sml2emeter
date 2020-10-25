@@ -49,6 +49,14 @@ add_executable(testsmlreader
 	util/sml_demodata.h
 )
 
+add_executable(countertest
+	util/countertest.cpp
+	util/spi_flash.h
+	util/spi_flash.cpp
+	counter.h
+	counter.cpp
+)
+
 if(WIN32)
    target_link_libraries(sml2emeter wsock32)
 endif(WIN32)
