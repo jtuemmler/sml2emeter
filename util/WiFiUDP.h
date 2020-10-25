@@ -6,7 +6,7 @@
 #ifndef WIFIUDP_H
 #define WIFIUDP_H
 
-#include "arduino_stubs.h"
+#include "Arduino.h"
 
 class WiFiUDP {
 public:

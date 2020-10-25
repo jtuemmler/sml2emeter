@@ -1,2 +1,4 @@
-﻿/build*
+/build*
 settings.h
+*.bin
+*.zip

@@ -38,6 +38,11 @@ public:
 
    operator const char*() { return std::string::c_str(); }
 
+   String& operator += (const String &other) {
+      std::string::append(other);
+      return *this;
+   }
+
    String& operator += (const char pOther[]) {
       std::string::append(pOther);
       return *this;
@@ -48,6 +53,18 @@ public:
       snprintf(converted, sizeof(converted) - 1, "%g", other);
       std::string::append(converted);
       return *this;
+   }
+
+   friend String operator + (const String &LHS, const String &RHS) {
+      String s(LHS);
+      s.append(RHS);
+      return s;
+   }
+
+   friend String operator + (const String &LHS, const char RHS[]) {
+      String s(LHS);
+      s.append(RHS);
+      return s;
    }
 };
 
@@ -67,11 +84,25 @@ unsigned long millis();
 #define LED_BUILTIN 1
 #define HIGH 1
 #define LOW 0
+#define CHANGE 3
+#define INPUT_PULLUP 4
 #define INPUT 0
 #define OUTPUT 1
+#define D1 1
 
 void digitalWrite(byte gpio, byte value);
+byte digitalRead(byte gpio);
 void pinMode(byte gpio, byte value);
+byte digitalPinToInterrupt(byte gpio);
+void attachInterrupt(byte gpio, void (*interrupHandler)(), byte type);
+void detachInterrupt(byte gpio);
+
+// ----------------------------------------------------------------------------
+// Interrupts
+// ----------------------------------------------------------------------------
+void interrupts();
+void noInterrupts();
+#define ICACHE_RAM_ATTR
 
 // ----------------------------------------------------------------------------
 // IPAddress

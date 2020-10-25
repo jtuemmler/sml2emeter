@@ -4,7 +4,7 @@
 // ----------------------------------------------------------------------------
 
 #include "WiFiUDP.h"
-#include "arduino_stubs.h"
+#include "Arduino.h"
 
 #ifndef WSAGetLastError
 #  include <errno.h>

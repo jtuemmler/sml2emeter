@@ -19,15 +19,19 @@ add_executable(sml2emeter
    smlparser.h
    crc16ccitt.h
    emeterpacket.h
+   counter.h
+   counter.cpp
    util/main.cpp
    util/sml_testpacket.h
-   util/arduino_stubs.h
-   util/arduino_stubs.cpp
+   util/Arduino.h
+   util/Arduino.cpp
    util/WiFiUDP.h
    util/WiFiUDP.cpp
    util/ESP8266WiFi.h
    util/IotWebConf.h
    util/PubSubClient.h
+   util/spi_flash.h
+   util/spi_flash.cpp
 )
 
 if(NOT MSVC)

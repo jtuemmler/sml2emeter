@@ -3,7 +3,7 @@
 // on a PC running windows, linux or macos
 // ----------------------------------------------------------------------------
 
-#include "arduino_stubs.h"
+#include "Arduino.h"
 #include "sml_testpacket.h"
 
 #ifndef _WIN32
@@ -47,7 +47,21 @@ unsigned long millis() {
 
 void digitalWrite(byte gpio, byte value) {}
 
+byte digitalRead(byte gpio) {
+   return HIGH;
+}
+
 void pinMode(byte gpio, byte value) {}
+
+void interrupts() {}
+
+void noInterrupts() {}
+
+byte digitalPinToInterrupt(byte gpio) { return 0; }
+
+void attachInterrupt(byte gpio, void(*interrupHandler)(), byte type) {}
+
+void detachInterrupt(byte gpio) {}
 
 SerialImpl::~SerialImpl()
 {

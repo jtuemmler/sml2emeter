@@ -5,7 +5,7 @@
 // Change serial number if running on a PC
 #define EMETER_SERNO 994420617
 
-#include "arduino_stubs.h"
+#include "Arduino.h"
 
 SerialImpl Serial;
 ESPImpl ESP;

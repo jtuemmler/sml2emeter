@@ -6,7 +6,7 @@
 #ifndef ESP8266WIFI_H
 #define ESP8266WIFI_H
 
-#include "arduino_stubs.h"
+#include "Arduino.h"
 
 const int WL_CONNECTED = 1;
 
