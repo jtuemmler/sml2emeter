@@ -9,6 +9,9 @@
    IotWebConf, Version 2.3.1
    PubSubClient, Version 2.8.0
 
+   Flash-layout:
+   4MB FS 1MB, OTA
+
    Configuration:
    This sketch provides a web-server for configuration.
    For more details, see the readme:
@@ -32,7 +35,7 @@
 // ----------------------------------------------------------------------------
 
 // Application version
-const char VERSION[] = "Version 1.5.C";
+const char VERSION[] = "Version 1.5.D";
 
 // Controls whether to publish debugging-information regarding impulse detection
 #define DEBUG_IMPULSES 0
