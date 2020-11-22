@@ -1,7 +1,7 @@
 /**
    ESP8266 SML to SMA energy meter converter
 
-   ﻿This sketch reads SML telegrams from an infrared D0 interface, converts them to SMA energy-meter
+   This sketch reads SML telegrams from an infrared D0 interface, converts them to SMA energy-meter
    telegrams and sends them via UDP.
 
    Dependencies:
@@ -25,6 +25,7 @@
 #include "smlparser.h"
 #include "emeterpacket.h"
 #include "counter.h"
+#include "webconfparameter.h"
 
 // ----------------------------------------------------------------------------
 // Compile time settings
@@ -177,28 +178,19 @@ unsigned long mqttLastPublishedImpulses = 0UL;
 IotWebConf iotWebConf(THING_NAME, &dnsServer, &server, WIFI_INITIAL_AP_PASSWORD, CONFIG_VERSION);
 
 // User-defined configuration values for IotWebConf
-char destinationAddress1Value[STRING_LEN] = "";
-char destinationAddress2Value[STRING_LEN] = "";
-char serialNumberValue[NUMBER_LEN] = "";
-char portValue[NUMBER_LEN] = "";
-char mqttBrockerAddressValue[NUMBER_LEN] = "";
-char mqttPortValue[NUMBER_LEN] = "0";
-char pulseTimeoutMsValue[NUMBER_LEN] = "0";
-char pulseFactorValue[NUMBER_LEN] = "0.01";
+WebConfParameter separator1(iotWebConf, "Meter configuration");
+WebConfParameter serialNumberParam(iotWebConf, "Serial number", "serialNumber", NUMBER_LEN, "number", "", "min='0' max='999999999' step='1'");
+WebConfParameter destinationAddress1Param(iotWebConf, "Unicast address 1", "destinationAddress1", STRING_LEN);
+WebConfParameter destinationAddress2Param(iotWebConf, "Unicast address 2", "destinationAddress2", STRING_LEN);
+WebConfParameter portParam(iotWebConf, "Port (default 9522)", "port", NUMBER_LEN, "number", "9522", "min='0' max='65535' step='1'");
 
-IotWebConfSeparator separator1("Meter configuration");
-IotWebConfParameter serialNumberParam("Serial number", "serialNumber", serialNumberValue, NUMBER_LEN, "number", serialNumberValue, serialNumberValue, "min='0' max='999999999' step='1'");
-IotWebConfParameter destinationAddress1Param("Unicast address 1", "destinationAddress1", destinationAddress1Value, STRING_LEN, "");
-IotWebConfParameter destinationAddress2Param("Unicast address 2", "destinationAddress2", destinationAddress2Value, STRING_LEN, "");
-IotWebConfParameter portParam("Port (default 9522)", "port", portValue, NUMBER_LEN, "number", portValue, portValue, "min='0' max='65535' step='1'");
+WebConfParameter separator2(iotWebConf, "MQTT broker configuration");
+WebConfParameter mqttBrockerAddressParam(iotWebConf, "Hostname", "mqttBrockerAddress", STRING_LEN);
+WebConfParameter mqttPortParam(iotWebConf, "Port (default 1883)", "mqttPort", NUMBER_LEN, "number", "0", "min='0' max='65535' step='1'");
 
-IotWebConfSeparator separator2("MQTT broker configuration");
-IotWebConfParameter mqttBrockerAddressParam("Hostname", "mqttBrockerAddress", mqttBrockerAddressValue, STRING_LEN, "");
-IotWebConfParameter mqttPortParam("Port (default 1883)", "mqttPort", mqttPortValue, NUMBER_LEN, "number", mqttPortValue, mqttPortValue, "min='0' max='65535' step='1'");
-
-IotWebConfSeparator separator3("Pulse counting");
-IotWebConfParameter pulseTimeoutMsParam("Timeout for pulse-counter (ms)", "pulseTimeoutMs", pulseTimeoutMsValue, NUMBER_LEN, "number", pulseTimeoutMsValue, pulseTimeoutMsValue, "min='0' max='100000' step='1'");
-IotWebConfParameter pulseFactorParam("Factor for pulse-counter", "pulseFactor", pulseFactorValue, NUMBER_LEN, "number", pulseFactorValue, pulseFactorValue, "min='0' max='100000' step='0.01'");
+WebConfParameter separator3(iotWebConf, "Pulse counting");
+WebConfParameter pulseTimeoutMsParam(iotWebConf, "Timeout for pulse-counter (ms)", "pulseTimeoutMs", NUMBER_LEN, "number", "0", "min='0' max='100000' step='1'");
+WebConfParameter pulseFactorParam(iotWebConf, "Factor for pulse-counter", "pulseFactor", NUMBER_LEN, "number", "0.01", "min='0' max='100000' step='0.01'");
 
 /**
    @brief Turn status led on
@@ -256,7 +248,6 @@ void signalConnectionState() {
       }
       nextLedChange += millis();
    }
-   iotWebConf.doLoop();
 }
 
 /**
@@ -283,6 +274,9 @@ void delayMs(unsigned long delayMs) {
    while (millis() - start < delayMs) {
       iotWebConf.doLoop();
       signalConnectionState();
+      if ((mqttPort > 0) && (iotWebConf.getState() == IOTWEBCONF_STATE_ONLINE)) {
+        mqttClient.loop();
+      }      
       delay(1);
    }
    storeImpulseCounter();
@@ -470,13 +464,14 @@ void handleData() {
 /**
    @brief Check, whether a valid IP address is given
 */
-bool checkIp(IotWebConfParameter &parameter) {
+bool checkIp(WebConfParameter &parameter) {
+   IotWebConfParameter &iotWebConfParameter = *parameter.get();
    IPAddress ip;
 
-   String arg = server.arg(parameter.getId());
+   String arg = server.arg(iotWebConfParameter.getId());
    if (arg.length() > 0) {
       if (!ip.fromString(arg)) {
-         parameter.errorMessage = "IP address is not valid!";
+         iotWebConfParameter.errorMessage = "Invalid IP address!";
          return false;
       }
    }
@@ -498,33 +493,33 @@ bool formValidator() {
 */
 void configSaved() {
    Serial.println("Configuration was updated.");
-   port = atoi(portValue);
+   port = portParam.getInt();
    numDestAddresses = 0;
-   if (destAddresses[numDestAddresses].fromString(destinationAddress1Value)) {
+   if (destAddresses[numDestAddresses].fromString(destinationAddress1Param.getText())) {
       ++numDestAddresses;
    }
-   if (destAddresses[numDestAddresses].fromString(destinationAddress2Value)) {
+   if (destAddresses[numDestAddresses].fromString(destinationAddress2Param.getText())) {
       ++numDestAddresses;
    }
 
-   Serial.print("serNo: "); Serial.println(serialNumberValue);
+   Serial.print("serNo: "); Serial.println(serialNumberParam.getText());
    Serial.print("port: "); Serial.println(port);
    Serial.print("numDestAddresses: "); Serial.println(numDestAddresses);
 
-   emeterPacket.init(atoi(serialNumberValue));
+   emeterPacket.init(serialNumberParam.getInt());
 
    mqttClient.disconnect();
-   mqttPort = mqttBrockerAddressValue[0] == 0 ? 0 : atoi(mqttPortValue);
+   mqttPort = mqttBrockerAddressParam.isEmpty() ? 0 : mqttPortParam.getInt();
    if (mqttPort > 0) {
       mqttTopic = String("/") + iotWebConf.getThingName() + String("/data");
       mqttTopicImpulses = String("/") + iotWebConf.getThingName() + String("/impulses");
 
       Serial.print("mqttTopic: "); Serial.println(mqttTopic);
-      mqttClient.setServer(mqttBrockerAddressValue, mqttPort);
+      mqttClient.setServer(mqttBrockerAddressParam.getText(), mqttPort);
    }
 
-   pulseTimeoutMs = pulseTimeoutMsValue[0] == 0 ? 0 : atoi(pulseTimeoutMsValue);
-   pulseFactor = pulseFactorValue[0] == 0 ? 0.0 : atof(pulseFactorValue);
+   pulseTimeoutMs = pulseTimeoutMsParam.getInt();
+   pulseFactor = pulseFactorParam.getFloat();
 
    if (pulseTimeoutMs > 0) {
       // Attach interrupt-handler
@@ -596,24 +591,9 @@ void setup() {
    impulseCounter.init(1000, 4096);
    impulses = impulseCounter.get();
 
-   itoa(990000000 + ESP.getChipId(), serialNumberValue, 10);
-   itoa(DESTINATION_PORT, portValue, 10);
+   serialNumberParam.setInt(990000000 + ESP.getChipId());
 
    //iotWebConf.setConfigPin(CONFIG_PIN);
-   iotWebConf.addParameter(&separator1);
-   iotWebConf.addParameter(&destinationAddress1Param);
-   iotWebConf.addParameter(&destinationAddress2Param);
-   iotWebConf.addParameter(&portParam);
-   iotWebConf.addParameter(&serialNumberParam);
-
-   iotWebConf.addParameter(&separator2);
-   iotWebConf.addParameter(&mqttBrockerAddressParam);
-   iotWebConf.addParameter(&mqttPortParam);
-
-   iotWebConf.addParameter(&separator3);
-   iotWebConf.addParameter(&pulseTimeoutMsParam);
-   iotWebConf.addParameter(&pulseFactorParam);
-
    iotWebConf.setConfigSavedCallback(&configSaved);
    iotWebConf.setFormValidator(&formValidator);
    iotWebConf.setupUpdateServer(&httpUpdater, "/update");
