@@ -128,6 +128,7 @@ public:
    operator const char*() const { return inet_ntoa(_address.sin_addr); }
    struct sockaddr_in getAddress() { return _address; }
    bool fromString(const String &address) { return false; }
+   String toString() const { return String("aaa.bbb.ccc.ddd"); }
 private:
    struct sockaddr_in _address;
 };
