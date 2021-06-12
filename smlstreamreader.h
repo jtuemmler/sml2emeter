@@ -5,8 +5,29 @@
 #include "util/sml_demodata.h"
 #include "smlparser.h"
 
+/**
+ * @brief Class to extract packets from a SML version 1 data stream.
+ * 
+ * See: https://www.bsi.bund.de/SharedDocs/Downloads/DE/BSI/Publikationen/TechnischeRichtlinien/TR03109/TR-03109-1_Anlage_Feinspezifikation_Drahtgebundene_LMN-Schnittstelle_Teilb.pdf?__blob=publicationFile,
+ * chapter 8.1 for details.
+ * 
+ * In short:
+ * - The packet size is a multiple of 4. If the original packet size was smaller, 1-3 padding bytes will be added.
+ * - Begin:    1b 1b 1b 1b       // Start of message; this is also the escape sequence
+ * - Version:  01 01 01 01       // version identifier for version 1
+ * - Data:     xx xx xx xx       // any data
+ * - End:      1b 1b 1b 1b       // End of message; this is also the escape sequence
+ * - Crc:      1a xx ch cl       // CRC. xx = number of padding bytes, ch = crc16 high, cl = crc16 low
+ * 
+ * Escaping:
+ * - If the payload contains the escape sequence 1b 1b 1b 1b, then
+ */
 class SmlStreamReader {
 public:
+   /**
+    * @brief Contruct a new stream reader
+    * @param maxPacketSize Reserved memory for a packet in bytes.
+    */
    SmlStreamReader(int maxPacketSize) : 
       _currentState(&SmlStreamReader::stateReadData),
       _maxPacketSize(maxPacketSize),
@@ -18,18 +39,39 @@ public:
       _data = new uint8_t[_maxPacketSize];
    }
 
+   /**
+    * @brief Destructor
+    */
    ~SmlStreamReader() {
       delete[] _data;
    }
 
+   /**
+    * @brief Returns the current packet buffer.
+    */
    inline const uint8_t *getData() { return _data; }
 
+   /**
+    * @brief Returns the length of the current packet buffer.
+    */
    inline int getLength() { return _packetLength; }
 
+   /**
+    * @brief Returns the expected CRC.
+    */
    inline uint16_t getCrc16() { return _crc16Expected; }
 
+   /**
+    * @brief Returns the number of parse errors.
+    */
    inline uint32_t getParseErrors() const { return _parseErrors; }
 
+   /**
+    * @brief Adds data from the stream to the parser.
+    * @param pData Data to add
+    * @param length Number of bytes to add
+    * @return The size of the complete packet or -1 if the packet is not ready.
+    */
    int addData(const uint8_t *pData, int length) {
       for (int i = 0; i < length; ++i) {
          _crc16.calc(pData[i]);
@@ -115,4 +157,4 @@ private:
    }
 };
 
-#endif
+#endif // SML_STREAM_READER_H
