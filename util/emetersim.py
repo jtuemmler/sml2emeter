@@ -5,6 +5,9 @@ import sys
 #
 # Script to test sml2emeter without a real energy meter
 #
+# You need pySerial installed:
+# python3 -m pip install pyserial
+#
 # To test with a nodemcu on windows use:
 # python emetersim.py COM4
 #
