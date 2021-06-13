@@ -23,6 +23,7 @@
 #include <WiFiUDP.h>
 #include <PubSubClient.h>
 #include <spi_flash.h>
+#include <SoftwareSerial.h>
 #include "util/sml_testpacket.h"
 #include "smlstreamreader.h"
 #include "smlparser.h"
@@ -35,10 +36,10 @@
 // ----------------------------------------------------------------------------
 
 // Application version
-const char VERSION[] = "Version 1.5.D";
+const char VERSION[] = "Version 1.5.E";
 
 // Controls whether to publish debugging-information regarding impulse detection
-#define DEBUG_IMPULSES 0
+const int MIRROR_SERIAL_PIN = D2;
 
 // Use demo data
 //  Set to false, to read data from serial port or to
@@ -52,11 +53,7 @@ const int TEST_PACKET_RECEIVE_TIME_MS = (SML_TEST_PACKET_LENGTH * 8 * 1000) / 96
 const IPAddress MCAST_ADDRESS = IPAddress(239, 12, 255, 254);
 
 // Port used for energy meter packets
-const uint16_t DESTINATION_PORT = 9522;
-
-// Debugging (set SML_PORT = 0 to disable)
-const IPAddress SML_ADDRESS = IPAddress(192, 168, 2, 100);
-const uint16_t SML_PORT = 0;
+const uint16_t SMA_ENERGYMETER_PORT = 9522;
 
 // PIN for pulse-counting
 const int PULSE_INPUT_PIN = D1;
@@ -79,7 +76,7 @@ const char CONFIG_VERSION[] = "v2";
 
 // When CONFIG_PIN is pulled to ground on startup, the Thing will use the initial
 //   password to buld an AP. (E.g. in case of lost password)
-const int CONFIG_PIN = D2;
+const int CONFIG_PIN = D3;
 
 // Static part of the web-page
 const char INDEX_HTML[] = "<!doctypehtml><meta charset=utf-8><meta content=\"width=device-width,initial-scale=1,user-scalable=no\"name=viewport><title>Energy meter</title><script>function u(a,t){var r=new XMLHttpRequest;r.onreadystatechange=function(){if(4==r.readyState&&200==r.status){var t=JSON.parse(r.responseText),e=\"\";for(var n in t)e=e.concat(\"<tr><th>{k}</th><td>{v}</td></tr>\".replace(\"{k}\",n).replace(\"{v}\",t[n]));document.getElementById(a).innerHTML='<table style=\"width:100%\">{d}</table>'.replace(\"{d}\",e)}},r.open(\"GET\",t,!0),r.send()}function r(){u(\"data\",\"data\")}function i(){r();self.setInterval(function(){r()},2e3)}window.onload=i()</script><style>div{padding:5px;font-size:1em}p{margin:.5em 0}body{text-align:center;font-family:verdana}td{padding:0}th{padding:5px;width:50%}td{padding:5px;width:50%}button{border:0;border-radius:.3rem;background-color:#1fa3ec;color:#fff;line-height:2.4rem;font-size:1.2rem;width:100%;-webkit-transition-duration:.4s;transition-duration:.4s;cursor:pointer}button:hover{background-color:#0e70a4}</style><div style=text-align:left;display:inline-block;min-width:340px><div style=text-align:center><noscript>Please enable JavaScript<br></noscript><h2>Energy meter</h2></div><div id=data> </div><p><form action=config><button>Configuration</button></form><div style=text-align:right;font-size:11px><hr>{v}</div></div>";
@@ -148,13 +145,15 @@ volatile int eventPos = 0;
 
 #endif
 
+SoftwareSerial mirrorSerial;
+
 // Destination addresses for sending meter packets
-const int DEST_ADRESSES_SIZE = 2;
-IPAddress destAddresses[DEST_ADRESSES_SIZE];
+const int DEST_ADDRESSES_SIZE = 2;
+IPAddress destAddresses[DEST_ADDRESSES_SIZE];
 uint8_t numDestAddresses = 0;
 
-// Destination port
-uint16_t port = DESTINATION_PORT;
+// Destination ports
+uint16_t ports[DEST_ADDRESSES_SIZE];
 
 // UDP instance for sending packets
 WiFiUDP Udp;
@@ -181,15 +180,15 @@ unsigned long mqttLastPublishedImpulses = 0UL;
 IotWebConf iotWebConf(THING_NAME, &dnsServer, &server, WIFI_INITIAL_AP_PASSWORD, CONFIG_VERSION);
 
 // User-defined configuration values for IotWebConf
-WebConfParameter separator1(iotWebConf, "Meter configuration");
+WebConfParameter separator1(iotWebConf, "SMA energy-meter configuration");
 WebConfParameter serialNumberParam(iotWebConf, "Serial number", "serialNumber", NUMBER_LEN, "number", "", "min='0' max='999999999' step='1'");
 WebConfParameter destinationAddress1Param(iotWebConf, "Unicast address 1", "destinationAddress1", STRING_LEN);
 WebConfParameter destinationAddress2Param(iotWebConf, "Unicast address 2", "destinationAddress2", STRING_LEN);
-WebConfParameter portParam(iotWebConf, "Port (default 9522)", "port", NUMBER_LEN, "number", "9522", "min='0' max='65535' step='1'");
+WebConfParameter portParam(iotWebConf, "Port (default 9522, 0 to turn off)", "port", NUMBER_LEN, "number", "9522", "min='0' max='65535' step='1'");
 
 WebConfParameter separator2(iotWebConf, "MQTT broker configuration");
 WebConfParameter mqttBrockerAddressParam(iotWebConf, "Hostname", "mqttBrockerAddress", STRING_LEN);
-WebConfParameter mqttPortParam(iotWebConf, "Port (default 1883)", "mqttPort", NUMBER_LEN, "number", "0", "min='0' max='65535' step='1'");
+WebConfParameter mqttPortParam(iotWebConf, "Port (default 1883, 0 to turn off)", "mqttPort", NUMBER_LEN, "number", "0", "min='0' max='65535' step='1'");
 
 WebConfParameter separator3(iotWebConf, "Pulse counting");
 WebConfParameter pulseTimeoutMsParam(iotWebConf, "Timeout for pulse-counter (ms)", "pulseTimeoutMs", NUMBER_LEN, "number", "0", "min='0' max='100000' step='1'");
@@ -363,8 +362,11 @@ void readSerial() {
             receiving = true;
             waitCount = 0;
          }
-         uint8_t byte = (uint8_t)data;
-         if (smlStreamReader.addData(&byte, 1) >= 0) {
+         uint8_t dataByte = (uint8_t)data;
+         if (MIRROR_SERIAL_PIN >= 0) {
+            mirrorSerial.write(dataByte);
+         }
+         if (smlStreamReader.addData(&dataByte, 1) >= 0) {
             break;
          }
       }
@@ -473,8 +475,14 @@ bool checkIp(WebConfParameter &parameter) {
 
    String arg = server.arg(iotWebConfParameter.getId());
    if (arg.length() > 0) {
-      if (!ip.fromString(arg)) {
-         iotWebConfParameter.errorMessage = "Invalid IP address!";
+      char ipAddress[STRING_LEN + 1] = { 0 };
+      strncpy(ipAddress, arg.c_str(), STRING_LEN);
+      char *pPortPos = strchr(ipAddress, ':');
+      if (pPortPos != NULL) {
+         *pPortPos = 0;
+      }
+      if (!ip.fromString(ipAddress)) {
+         iotWebConfParameter.errorMessage = "IP address is not valid!";
          return false;
       }
    }
@@ -492,22 +500,40 @@ bool formValidator() {
 }
 
 /**
+   @brief Parse IP addresses and ports
+ */
+void parseDestinationAddress(const char *pDestinationAddressValue) {
+   char destinationAddress[STRING_LEN + 1] = { 0 };
+   strncpy(destinationAddress, pDestinationAddressValue, STRING_LEN);
+   char *pPortPos = strchr(destinationAddress, ':');
+   if (pPortPos == NULL) {
+      ports[numDestAddresses] = portParam.getInt();
+   }
+   else {
+      *pPortPos = 0;
+      ports[numDestAddresses] = atoi(pPortPos + 1);
+   }
+   if (destAddresses[numDestAddresses].fromString(destinationAddress)) {
+      ++numDestAddresses;
+   }
+}
+
+/**
    @brief Process changed configuration
 */
 void configSaved() {
    Serial.println("Configuration was updated.");
-   port = portParam.getInt();
    numDestAddresses = 0;
-   if (destAddresses[numDestAddresses].fromString(destinationAddress1Param.getText())) {
-      ++numDestAddresses;
-   }
-   if (destAddresses[numDestAddresses].fromString(destinationAddress2Param.getText())) {
-      ++numDestAddresses;
-   }
+   parseDestinationAddress(destinationAddress1Param.getText());
+   parseDestinationAddress(destinationAddress2Param.getText());
 
-   Serial.print("serNo: "); Serial.println(serialNumberParam.getText());
-   Serial.print("port: "); Serial.println(port);
-   Serial.print("numDestAddresses: "); Serial.println(numDestAddresses);
+   Serial.print("serNo: "); Serial.println(serialNumberParam.getInt());
+   for (int i = 0; i < numDestAddresses; ++i) {
+      Serial.print("Destination address: ");
+      Serial.print(destAddresses[i].toString());
+      Serial.print(", port: ");
+      Serial.println(ports[i]);
+   }
 
    emeterPacket.init(serialNumberParam.getInt());
 
@@ -581,6 +607,11 @@ void setup() {
    Serial.begin(9600);
    while (!Serial);
 
+   // Open software-serial to mirror SML data
+   if (MIRROR_SERIAL_PIN >= 0) {
+      mirrorSerial.begin(9600, SWSERIAL_8N1, -1, MIRROR_SERIAL_PIN, true);
+   }
+
    Serial.println();
    Serial.print("ESP8266-D0 to SMA Energy Meter ");
    Serial.println(VERSION);
@@ -595,6 +626,7 @@ void setup() {
    impulses = impulseCounter.get();
 
    serialNumberParam.setInt(990000000 + ESP.getChipId());
+   portParam.setInt(SMA_ENERGYMETER_PORT);
 
    //iotWebConf.setConfigPin(CONFIG_PIN);
    iotWebConf.setConfigSavedCallback(&configSaved);
@@ -628,32 +660,30 @@ void setup() {
 
 /**
    @brief Publish data for emeter-protocol
-   @param smlPacketLength length of the SML packet
 */
 void publishEmeter() {
-   if (port > 0) {
+   if (ports[0] > 0) {
       updateEmeterPacket();
+      // We use a do..while loop here to force at least one execution of the loop-body.
       int i = 0;
       do {
          Serial.print("S");
          if (numDestAddresses == 0) {
-            Udp.beginPacketMulticast(MCAST_ADDRESS, port, WiFi.localIP(), 1);
+            Udp.beginPacketMulticast(MCAST_ADDRESS, ports[0], WiFi.localIP(), 1);                     
          }
          else {
-            Udp.beginPacket(destAddresses[i], port);
+            Udp.beginPacket(destAddresses[i], ports[i]);           
          }
 
-         if (port == DESTINATION_PORT) {
+         if (ports[i] == SMA_ENERGYMETER_PORT) {
             Udp.write(emeterPacket.getData(), emeterPacket.getLength());
          }
          else {
             Udp.write(smlStreamReader.getData(), smlStreamReader.getLength());
          }
 
-         // Send paket
-         Udp.endPacket();
-         ++i;
-      } while (i < numDestAddresses);
+         Udp.endPacket();      
+      } while (++i < numDestAddresses);
    }
 }
 
@@ -759,13 +789,6 @@ void loop() {
    }
    else {
       Serial.print("E");
-   }
-
-   // Debugging
-   if (SML_PORT > 0) {
-      Udp.beginPacket(SML_ADDRESS, SML_PORT);
-      Udp.write(smlStreamReader.getData(), smlStreamReader.getLength());
-      Udp.endPacket();
    }
 
    Serial.println(".");
