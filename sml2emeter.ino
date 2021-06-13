@@ -181,10 +181,10 @@ IotWebConf iotWebConf(THING_NAME, &dnsServer, &server, WIFI_INITIAL_AP_PASSWORD,
 
 // User-defined configuration values for IotWebConf
 WebConfParameter separator1(iotWebConf, "SMA energy-meter configuration");
-WebConfParameter serialNumberParam(iotWebConf, "Serial number", "serialNumber", NUMBER_LEN, "number", "", "min='0' max='999999999' step='1'");
 WebConfParameter destinationAddress1Param(iotWebConf, "Unicast address 1", "destinationAddress1", STRING_LEN);
 WebConfParameter destinationAddress2Param(iotWebConf, "Unicast address 2", "destinationAddress2", STRING_LEN);
 WebConfParameter portParam(iotWebConf, "Port (default 9522, 0 to turn off)", "port", NUMBER_LEN, "number", "9522", "min='0' max='65535' step='1'");
+WebConfParameter serialNumberParam(iotWebConf, "Serial number", "serialNumber", NUMBER_LEN, "number", "", "min='0' max='999999999' step='1'");
 
 WebConfParameter separator2(iotWebConf, "MQTT broker configuration");
 WebConfParameter mqttBrockerAddressParam(iotWebConf, "Hostname", "mqttBrockerAddress", STRING_LEN);
