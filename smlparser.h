@@ -10,15 +10,26 @@
 class SmlParser {
 public:
    /// Constructor
-   SmlParser() : _parsedOk(0U), _parseErrors(0U), _powerInW(0U), _powerOutW(0U), _energyInWh(0UL), _energyOutWh(0UL) {}
+   SmlParser() : _parsedOk(0U), _parseErrors(0U), _powerInW(0U), _powerOutW(0U), _energyInWh(0UL), _energyOutWh(0UL),
+      _pPacket(NULL), _packetLength(0) {}
 
-   /// Getters. All values are given in centi-W or centi-Wh
+   /// Number of successfully parsed packets.
    inline uint32_t getParsedOk() const { return _parsedOk; }
+
+   /// Number of parse errors.
    inline uint32_t getParseErrors() const { return _parseErrors; }
-   inline uint32_t getPowerInW() const { return _powerInW; }
-   inline uint32_t getPowerOutW() const { return _powerOutW; }
-   inline uint64_t getEnergyInWh() const { return _energyInWh; }
-   inline uint64_t getEnergyOutWh() const { return _energyOutWh; }
+   
+   /// Imported power in centi W (1cW = 0.01W)
+   inline uint32_t getPowerIn() const { return _powerInW; }
+
+   /// Exported power in centi W (1cW = 0.01W)
+   inline uint32_t getPowerOut() const { return _powerOutW; }
+
+   /// Imported energy in centi Wh (1cW = 0.01Wh)
+   inline uint64_t getEnergyIn() const { return _energyInWh; }
+
+   /// Exported energy in centi Wh (1cW = 0.01Wh)
+   inline uint64_t getEnergyOut() const { return _energyOutWh; }
 
    /**
     * @brief Parse a SML packet
@@ -48,7 +59,8 @@ public:
          _crc16.calc(pPacket + messageStart, messageLength);
          if (crc16Expected == _crc16.getCrc()) {
             if (parseMessageBody(messageBody)) {
-               break;
+               ++_parsedOk;
+               return true;
             }
             // Skip 'end of message'
             ++pos;
@@ -57,11 +69,10 @@ public:
             //printf("Parser: Warning %04x != %04x\n", crc16Expected, _crc16.getCrc());
             ++_parseErrors;
             return false;
-            break;
          }
       }
-      ++_parsedOk;
-      return true;
+      // Incomplete or empty packet.
+      return false;
    }
 
 protected:
@@ -250,7 +261,11 @@ protected:
    }
 };
 
-// Scale factors                                                       -2  -1    0     1      2       3        4         5
+// Scale factors
+// Note: Exponent of the scale factors is shifted by 2 (10^0 becomes 10^2, etc.)
+//       This is done to keep integer calculations as long as possible.
+//       As a result, all values are returned as Centi-W or Centi-Wh.
+//                                                                     -2  -1    0     1      2       3        4         5
 const int32_t SmlParser::SCALE_FACTORS[SmlParser::SML_SCALE_VALUES] = { 1, 10, 100, 1000, 10000, 100000, 1000000, 10000000 };
 
 #endif // SMLPARSER_H

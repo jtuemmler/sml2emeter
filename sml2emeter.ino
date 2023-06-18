@@ -134,7 +134,7 @@ volatile unsigned long lastPulseEventMs = 0UL;
 Counter impulseCounter;
 
 // Factor for m3 calculation
-float pulseFactor = 0.01;
+float pulseFactor = 0.01f;
 
 #if DEBUG_IMPULSES > 0
 
@@ -145,6 +145,7 @@ volatile int eventPos = 0;
 
 #endif
 
+// Additional serial port to mirror SML messages
 SoftwareSerial mirrorSerial;
 
 // Destination addresses for sending meter packets
@@ -333,14 +334,14 @@ void updateEmeterPacket() {
    emeterPacket.begin(millis());
 
    // Store active and reactive power (convert from centi-W to deci-W)
-   emeterPacket.addMeasurementValue(EmeterPacket::SMA_POSITIVE_ACTIVE_POWER, smlParser.getPowerInW() / 10);
-   emeterPacket.addMeasurementValue(EmeterPacket::SMA_NEGATIVE_ACTIVE_POWER, smlParser.getPowerOutW() / 10);
+   emeterPacket.addMeasurementValue(EmeterPacket::SMA_POSITIVE_ACTIVE_POWER, smlParser.getPowerIn() / 10);
+   emeterPacket.addMeasurementValue(EmeterPacket::SMA_NEGATIVE_ACTIVE_POWER, smlParser.getPowerOut() / 10);
    emeterPacket.addMeasurementValue(EmeterPacket::SMA_POSITIVE_REACTIVE_POWER, 0);
    emeterPacket.addMeasurementValue(EmeterPacket::SMA_NEGATIVE_REACTIVE_POWER, 0);
 
    // Store energy (convert from centi-Wh to Ws)
-   emeterPacket.addCounterValue(EmeterPacket::SMA_POSITIVE_ENERGY, smlParser.getEnergyInWh() * 36UL);
-   emeterPacket.addCounterValue(EmeterPacket::SMA_NEGATIVE_ENERGY, smlParser.getEnergyOutWh() * 36UL);
+   emeterPacket.addCounterValue(EmeterPacket::SMA_POSITIVE_ENERGY, smlParser.getEnergyIn() * 36UL);
+   emeterPacket.addCounterValue(EmeterPacket::SMA_NEGATIVE_ENERGY, smlParser.getEnergyOut() * 36UL);
 
    emeterPacket.end();
 }
@@ -423,13 +424,13 @@ String getCurrentDataAsJson(bool detailed = true) {
    String data = "{";
    if (smlParser.getParsedOk() > 0) {
       data += "\"PowerIn\":";
-      data += smlParser.getPowerInW() / 100.0;
+      data += smlParser.getPowerIn() / 100.0;
       data += ",\"EnergyIn\":";
-      data += smlParser.getEnergyInWh() / 100.0;
+      data += smlParser.getEnergyIn() / 100.0;
       data += ",\"PowerOut\":";
-      data += smlParser.getPowerOutW() / 100.0;
+      data += smlParser.getPowerOut() / 100.0;
       data += ",\"EnergyOut\":";
-      data += smlParser.getEnergyOutWh() / 100.0;
+      data += smlParser.getEnergyOut() / 100.0;
       if (detailed) {
          data += ",";
       }

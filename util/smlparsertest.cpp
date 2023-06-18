@@ -10,7 +10,7 @@ uint8_t smlPacket[SML_TEST_PACKET_LENGTH];
 
 class BaseDecodeTests : public SmlParser {
 public:
-   BaseDecodeTests() : SmlParser() {}
+   BaseDecodeTests() : SmlParser(), _buffer{ 0 } {}
 
    int run() {
       int failed = 0;
@@ -94,16 +94,16 @@ private:
 int checkResult(uint32_t powerInW, uint32_t powerOutW, uint64_t energyWh, uint32_t ok, uint32_t errors) {
    smlParser.parsePacket(smlPacket + 8, SML_TEST_PACKET_LENGTH - 8);
 
-   bool testOk = (smlParser.getPowerInW() == powerInW) &&
-         (smlParser.getPowerOutW() == powerOutW) &&
-         (smlParser.getEnergyInWh() == energyWh) &&
+   bool testOk = (smlParser.getPowerIn() == powerInW) &&
+         (smlParser.getPowerOut() == powerOutW) &&
+         (smlParser.getEnergyIn() == energyWh) &&
          (smlParser.getParsedOk() == ok) &&
          (smlParser.getParseErrors() == errors);
 
    printf("%s: %.2fW %.2fW %.2fWh %d %d\n", testOk ? "OK" : "ERROR",
-          smlParser.getPowerInW()/100.0,
-          smlParser.getPowerOutW()/100.0,
-          smlParser.getEnergyInWh()/100.0,
+          smlParser.getPowerIn()/100.0,
+          smlParser.getPowerOut()/100.0,
+          smlParser.getEnergyIn()/100.0,
           smlParser.getParsedOk(),
           smlParser.getParseErrors());
 

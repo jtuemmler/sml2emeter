@@ -60,8 +60,8 @@ int main(int argc, char ** argv) {
          if (offset >= 0) {
             if (parser.parsePacket(reader.getData(), reader.getLength())) {
                printf("%d. %s: Parsed OK: %d %ld %d %ld\n", i, SML_DATA[i].name, 
-                  parser.getPowerInW(), parser.getEnergyInWh(),
-                  parser.getPowerOutW(), parser.getEnergyOutWh());
+                  parser.getPowerIn(), parser.getEnergyIn(),
+                  parser.getPowerOut(), parser.getEnergyOut());
             }
             else {
                printf("%d. %s: Error\n", i, SML_DATA[i].name);
