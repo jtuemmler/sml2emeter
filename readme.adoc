@@ -163,9 +163,9 @@ For faster and more comfortable development it is possible to use https://visual
 === Links
 
 * https://www.bsi.bund.de/SharedDocs/Downloads/DE/BSI/Publikationen/TechnischeRichtlinien/TR03109/TR-03109-1_Anlage_Feinspezifikation_Drahtgebundene_LMN-Schnittstelle_Teilb.pdf?__blob=publicationFile[Technische Richtlinie BSI TR-03109-1 / SML]
-* https://www.bundesnetzagentur.de/DE/Service-Funktionen/Beschlusskammern/BK06/BK6_81_GPKE_GeLi/Mitteilung_Nr_20/Anlagen/Obis-Kennzahlen-System_2.0.pdf?__blob=publicationFile&v=2[OBIS-Kennzahlen-System]
+* https://www.bundesnetzagentur.de/DE/Beschlusskammern/BK06/BK6_83_Zug_Mess/835_mitteilungen_datenformate/Mitteilung_26/Anlagen/Codeliste_OBIS_24a.pdf?__blob=publicationFile&v=1[OBIS-Kennzahlen-System]
 * https://www.promotic.eu/en/pmdoc/Subsystems/Comm/PmDrivers/IEC62056_OBIS.htm[OBIS codes]
-* https://www.sma.de/fileadmin/content/global/Partner/Documents/SMA_Labs/EMETER-Protokoll-TI-de-10.pdf[SMA ENERGY METER Zählerprotokoll]
+* https://developer.sma.de/fileadmin/content/global/Partner/Documents/SMA_Labs/EMETER-Protokoll-TI-de-10.pdf[SMA ENERGY METER Zählerprotokoll]
 
 === Example SML message
 
