@@ -89,6 +89,9 @@ unsigned long millis();
 #define INPUT 0
 #define OUTPUT 1
 #define D1 1
+#define D2 2
+#define D3 3
+#define D4 4
 
 void digitalWrite(byte gpio, byte value);
 byte digitalRead(byte gpio);

@@ -13,8 +13,6 @@ static const byte IOTWEBCONF_STATE_ONLINE = 4;
 
 #include <functional>
 
-static const int D2 = 2;
-
 class DNSServer {
 public:
    DNSServer() {}

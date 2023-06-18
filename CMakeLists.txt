@@ -21,6 +21,7 @@ add_executable(sml2emeter
    emeterpacket.h
    counter.h
    counter.cpp
+   webconfparameter.h
    util/main.cpp
    util/sml_testpacket.h
    util/Arduino.h
@@ -28,6 +29,7 @@ add_executable(sml2emeter
    util/WiFiUDP.h
    util/WiFiUDP.cpp
    util/ESP8266WiFi.h
+   util/SoftwareSerial.h
    util/IotWebConf.h
    util/PubSubClient.h
    util/spi_flash.h
