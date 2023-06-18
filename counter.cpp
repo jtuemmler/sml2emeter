@@ -51,7 +51,7 @@ bool Counter::incrementBits(uint32_t & value)
    return true;
 }
 
-Counter::Counter() : sectorSize(0), currentBits(0), currentValue(0), activeBlock(0), blockOffset(0), initalized(false)
+Counter::Counter() : sectorSize(0), blockStart{ 0 }, currentBits(0), currentValue(0), activeBlock(0), blockOffset(0), initalized(false)
 { }
 
 void Counter::init(uint16_t sector, uint32_t sectorSize)
@@ -125,7 +125,7 @@ void Counter::restoreCounter(uint32_t startValue)
    currentValue = startValue;
    blockOffset = HEADER_SIZE;
    uint32_t counterBits[READ_BUFFER_SIZE];
-   uint32_t *pCurrentBits;
+   uint32_t *pCurrentBits = counterBits;
 
    while (blockOffset < sectorSize) {
       SpiFlashOpResult result = spi_flash_read(blockStart[activeBlock] + blockOffset, counterBits, sizeof(counterBits));

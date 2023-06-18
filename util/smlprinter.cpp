@@ -59,7 +59,7 @@ uint8_t* printString(uint8_t *pPacket, const int length, const int depth) {
    strncpy(s, "string = ", sizeof(s));
    for (int i = 1; i < length; ++i) {
       char c = pPacket[i];
-      s[i + 8] = ((c >= ' ') & (c <= 'Z')) ? c : '.';
+      s[i + 8] = (c >= ' ' && c <= 'Z') ? c : '.';
    }
    return printHex(pPacket, length, depth, s);
 }

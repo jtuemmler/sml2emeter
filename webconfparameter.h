@@ -24,7 +24,7 @@ public:
   {
     _length = length;
     _pBuffer = new char[length + 1];
-    memset(_pBuffer, length + 1, 0);
+    memset(_pBuffer, 0, length + 1);
     if (defaultValue != NULL)
     {
       strncpy(_pBuffer, defaultValue, length);
@@ -66,7 +66,7 @@ public:
   /**
    * @brief Checks, whether the parameter is empty.
    */
-  boolean isEmpty()
+  bool isEmpty()
   {
     return _pBuffer[0] == 0;
   }
@@ -92,7 +92,7 @@ public:
    */
   float getFloat()
   {
-    return isEmpty() ? 0.0 : atof(_pBuffer);
+    return isEmpty() ? 0.0f : (float)atof(_pBuffer);
   }
 
   /**

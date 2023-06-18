@@ -27,6 +27,9 @@ public:
    */
    uint32_t get();
    
+   /**
+   * @brief Print the internal state of the counter.
+   */
    void info();
 
 private:

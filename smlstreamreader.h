@@ -34,7 +34,9 @@ public:
       _escLen(0), 
       _escData(0U), 
       _parseErrors(0U),
-      _packetPos(0) 
+      _packetPos(0),
+      _packetLength(0),
+      _crc16Expected(0)
    {
       _data = new uint8_t[_maxPacketSize];
    }
