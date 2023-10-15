@@ -38,7 +38,7 @@
 // Application version
 const char VERSION[] = "Version 1.5.E";
 
-// Controls whether to publish debugging-information regarding impulse detection
+// Controls wether to mirror all incoming serial data to another serial output (set to -1 to disable)
 const int MIRROR_SERIAL_PIN = D2;
 
 // Use demo data
@@ -135,15 +135,6 @@ Counter impulseCounter;
 
 // Factor for m3 calculation
 float pulseFactor = 0.01f;
-
-#if DEBUG_IMPULSES > 0
-
-#define MAX_EVENTS 20
-volatile unsigned long eventTs[MAX_EVENTS];
-volatile char eventVal[MAX_EVENTS];
-volatile int eventPos = 0;
-
-#endif
 
 // Additional serial port to mirror SML messages
 SoftwareSerial mirrorSerial;
@@ -254,22 +245,6 @@ void signalConnectionState() {
 }
 
 /**
-   @brief Store the detected number of impulses in flash.
-*/
-void storeImpulseCounter() {
-   if (pulseTimeoutMs > 0) {
-      uint32_t currentImpulses = 0;
-      noInterrupts();
-      currentImpulses = impulses;
-      interrupts();
-      while (currentImpulses > impulseCounter.get()) {
-         Serial.print("s");
-         impulseCounter.increment();
-      }
-   }
-}
-
-/**
    @brief Wait the given time in ms
 */
 void delayMs(unsigned long delayMs) {
@@ -283,6 +258,22 @@ void delayMs(unsigned long delayMs) {
       delay(1);
    }
    storeImpulseCounter();
+}
+
+/**
+   @brief Store the detected number of impulses in flash.
+*/
+void storeImpulseCounter() {
+   if (pulseTimeoutMs > 0) {
+      uint32_t currentImpulses = 0;
+      noInterrupts();
+      currentImpulses = impulses;
+      interrupts();
+      while (currentImpulses > impulseCounter.get()) {
+         Serial.print("s");
+         impulseCounter.increment();
+      }
+   }
 }
 
 /**
@@ -300,13 +291,6 @@ ICACHE_RAM_ATTR void handlePulseInterrupt() {
 
       // State has changed ...
       unsigned long currentTimeMs = millis();
-
-#if DEBUG_IMPULSES > 0
-      if (eventPos < MAX_EVENTS) {
-         eventTs[eventPos] = micros();
-         eventVal[eventPos++] = state == LOW ? '0' : '1';
-      }
-#endif
 
       // If we changed from HIGH -> LOW, the beginning of an impulse has been detected.
       // Now wait until the signal is released ...
@@ -557,13 +541,10 @@ void configSaved() {
       Serial.println(PULSE_INPUT_PIN);
       Serial.print("Interrupt: ");
       Serial.println(digitalPinToInterrupt(PULSE_INPUT_PIN));
-
       attachInterrupt(digitalPinToInterrupt(PULSE_INPUT_PIN), handlePulseInterrupt, CHANGE);
-      //attachInterrupt(PULSE_INPUT_PIN, handlePulseInterrupt, FALLING);
    }
    else {
       detachInterrupt(digitalPinToInterrupt(PULSE_INPUT_PIN));
-      //detachInterrupt(PULSE_INPUT_PIN);
    }
 }
 
@@ -722,31 +703,10 @@ void publishMqtt() {
       ++mqttSendErrors;
    }
 
-   unsigned long currentTimeMs = millis();
-
-#if DEBUG_IMPULSES > 0
-   noInterrupts();
-   unsigned long myTs[MAX_EVENTS];
-   char myVal[MAX_EVENTS];
-   int myEventPos = eventPos;
-   for (int i = 0; i < myEventPos; ++i) {
-      myTs[i] = eventTs[i];
-      myVal[i] = eventVal[i];
-   }
-   eventPos = 0;
-   interrupts();
-
-   for (int i = 0; i < myEventPos; ++i) {
-      String eventStr;
-      eventStr += eventVal[i];
-      eventStr += ":";
-      eventStr += eventTs[i];
-      //Serial.print(eventStr);
-      mqttClient.publish("debug/interrupt", eventStr.c_str());
-   }
-#endif
-
    if (pulseTimeoutMs > 0) {
+      unsigned long currentTimeMs = millis();
+
+      // Fetch data into local storage
       noInterrupts();
       unsigned long mqttImpulses = impulses;
       unsigned long mqttInterruptCount = interruptCount;

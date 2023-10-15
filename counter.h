@@ -1,5 +1,5 @@
-#ifndef _COUNTER_H
-#define _COUNTER_H
+#ifndef COUNTER_H
+#define COUNTER_H
 
 #include <stdint.h>
 
@@ -74,4 +74,4 @@ private:
 };
 
 
-#endif
+#endif // COUNTER_H

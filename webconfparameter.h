@@ -117,4 +117,4 @@ private:
   IotWebConfParameter *_pParameter;
 };
 
-#endif
+#endif // WEBCONFPARAMETER_H
