@@ -4,6 +4,9 @@
 #include <stdint.h>
 #include "counter.h"
 
+/**
+* Class to implement pulse-counting to support gas-meters..
+*/
 class PulseCounter {
    private:
       // Input pin for detecting impulses
@@ -27,108 +30,59 @@ class PulseCounter {
       // Time (ticks) of the last received impulse
       volatile unsigned long lastPulseEventMs;
 
-      // Persisted instance of the impulse counter
-      Counter impulseCounter;
-
       // Factor for m3 calculation
       float pulseFactor;
 
-   public:
+      // Persisted instance of the impulse counter
+      Counter impulseCounter;
+
       /**
-         @brief Store the detected number of impulses in flash.
+      * @brief Constructor.
       */
-      PulseCounter(int inputPin) : pulseTimeoutMs(0UL), isrArmed(0), isrLastState(-2), impulses(0UL), interruptCount(0UL), lastPulseEventMs(0UL), pulseFactor(0.01f) {
-         this->inputPin = inputPin;
-         pinMode(inputPin, INPUT_PULLUP);
-      }
+      PulseCounter();
+      
+      /**
+      * @brief Constructor.
+      */
+      static void handleInterrupt();
 
-      void init(uint16_t sector, uint32_t sectorSize)
-      {
-         impulseCounter.init(sector, sectorSize);
-         impulses = impulseCounter.get();
-      }
+      /**
+      * @brief Handle the interrupt of the input-pin.
+      */
+      void handleInterruptInternal();
 
-      void store() {
-         if (pulseTimeoutMs > 0) {
-            uint32_t currentImpulses = 0;
-            noInterrupts();
-            currentImpulses = impulses;
-            interrupts();
-            while (currentImpulses > impulseCounter.get()) {
-               Serial.print("s");
-               impulseCounter.increment();
-            }
-         }
-      }
+   public:
+ 
+      /**
+      * @brief Return the instance of the PulseCounter.
+      */
+      static PulseCounter& getInstance();
 
-      bool handleInterrupt() {
-         bool updated = false;
-         
-         // Check whether impulses should be detected.
-         if (pulseTimeoutMs > 0) {
-            // Check whether the state if the dection pin has been changed.
-            int state = digitalRead(inputPin);
-            if (state == isrLastState) {
-               return updated;
-            }
-            isrLastState = state;
+      /**
+      * @brief Initialize pulse counting and restore last state from flash.
+      * @param inputPin Pin to use for pulse-counting.
+      * @param sector First sector used for persisting the counter.
+      * @param sectorSize Size (in bytes) of a sector.
+      */
+      void init(int inputPin, uint16_t sector, uint32_t sectorSize);
 
-            // State has changed ...
-            unsigned long currentTimeMs = millis();
+      /**
+      * @brief Persist current state to flash.
+      */
+      void store();
 
-            // If we changed from HIGH -> LOW, the beginning of an impulse has been detected.
-            // Now wait until the signal is released ...
-            if (state == LOW) {
-               lastPulseEventMs = currentTimeMs;
-               isrArmed = 1;
-            }
-            else if ((state == HIGH) && (isrArmed == 1)) {
-               // Signal was released and we've detected the beginning before.
-               isrArmed = 0;
-               // Now check if the debounce-timeout has been elapsed. If so, count the impulse.
-               if (((currentTimeMs - lastPulseEventMs) > pulseTimeoutMs) || (currentTimeMs < lastPulseEventMs)) {
-                  updated = true;
-                  ++impulses;
-                  Serial.print("i");
-               }
-            }
-         }
+      /**
+      * @brief Update internal configuration.
+      */
+      void updateConfig(int pulseTimeoutMs, float pulseFactor);
 
-         return updated;
-      }
+      /**
+      * @brief Get current data.
+      * @param[out] impulsesOut  Current number of detected impulses.
+      * @param[out] m3Out        Current volume in m3.
+      */
+      void get(unsigned long& impulsesOut, float& m3Out);
 
-      void updateConfig(void(*interrupHandler)(), int pulseTimeoutMs, float pulseFactor) {
-         this->pulseTimeoutMs = (unsigned long)pulseTimeoutMs;
-         this->pulseFactor = pulseFactor;
-
-         if (pulseTimeoutMs > 0) {
-            // Attach interrupt-handler
-            Serial.print("Pulse-Pin: ");
-            Serial.println(inputPin);
-            Serial.print("Interrupt: ");
-            Serial.println(digitalPinToInterrupt(inputPin));
-            attachInterrupt(digitalPinToInterrupt(inputPin), interrupHandler, CHANGE);
-         }
-         else {
-            detachInterrupt(digitalPinToInterrupt(inputPin));
-         }   
-      }
-
-      void get(unsigned long &impulsesOut, float &m3Out) {
-         if (pulseTimeoutMs > 0) {
-            // Fetch data into local storage
-            noInterrupts();
-            impulsesOut = impulses;
-            //unsigned long mqttInterruptCount = interruptCount;
-            //unsigned long mqttLastPulseEventMs = lastPulseEventMs;
-            interrupts();
-
-         }
-         else {
-            impulsesOut = 0;
-         }
-         m3Out = impulsesOut * pulseFactor;
-      }
 };
 
 

@@ -9,12 +9,15 @@
 class Counter {
 public:
    /**
-   * @brief Create a counter and restore the latest state from flash.
-   * @param sector First sector used for persisting the counter.
-   * @param sectorSize Size (in bytes) of a sector.
+   * @brief Create a counter.
    */
    Counter();
 
+   /**
+   * @brief Initialize the counter and restore the latest state from flash.
+   * @param sector First sector used for persisting the counter.
+   * @param sectorSize Size (in bytes) of a sector.
+   */
    void init(uint16_t sector, uint32_t sectorSize);
    
    /**

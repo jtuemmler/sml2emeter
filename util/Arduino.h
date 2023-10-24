@@ -178,6 +178,8 @@ private:
    int _testDataPos;
 };
 
+extern SerialImpl Serial;
+
 // ----------------------------------------------------------------------------
 // ESP implementation
 // ----------------------------------------------------------------------------
@@ -195,5 +197,7 @@ public:
       exit(-1);
    }
 };
+
+extern ESPImpl ESP;
 
 #endif

@@ -113,7 +113,7 @@ bool ledState = false;
 unsigned long nextLedChange = 0;
 
 // Pulse-counter instance
-PulseCounter pulseCounter(PULSE_INPUT_PIN);
+PulseCounter pulseCounter = PulseCounter::getInstance();
 
 // Additional serial port to mirror SML messages
 SoftwareSerial mirrorSerial;
@@ -237,15 +237,6 @@ void delayMs(unsigned long delayMs) {
       delay(1);
    }
    pulseCounter.store();
-}
-
-/**
-   @brief Handle interrupt from pulse-counter
-*/
-ICACHE_RAM_ATTR void handlePulseInterrupt() {
-   if (pulseCounter.handleInterrupt()) {
-      ledOnFor(2000);
-   }
 }
 
 /**
@@ -473,7 +464,7 @@ void configSaved() {
       mqttClient.setServer(mqttBrockerAddressParam.getText(), mqttPort);
    }
 
-   pulseCounter.updateConfig(handlePulseInterrupt, pulseTimeoutMsParam.getInt(), pulseFactorParam.getFloat());
+   pulseCounter.updateConfig(pulseTimeoutMsParam.getInt(), pulseFactorParam.getFloat());
 }
 
 /**
@@ -531,7 +522,7 @@ void setup() {
    Serial.print("MAC address: ");
    Serial.println(WiFi.macAddress());
 
-   pulseCounter.init(1000, 4096);
+   pulseCounter.init(PULSE_INPUT_PIN, 1000, 4096);
 
    serialNumberParam.setInt(990000000 + ESP.getChipId());
    portParam.setInt(SMA_ENERGYMETER_PORT);

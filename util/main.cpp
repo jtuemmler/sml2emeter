@@ -7,9 +7,6 @@
 
 #include "Arduino.h"
 
-SerialImpl Serial;
-ESPImpl ESP;
-
 #include "../sml2emeter.ino"
 
 int main(int argc, char** argv) {

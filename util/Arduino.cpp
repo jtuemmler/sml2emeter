@@ -152,3 +152,6 @@ char *itoa(int value, char *str, int base)
 String::String() : std::string() {}
 
 String::String(const char pOther[]) : std::string(pOther) {}
+
+SerialImpl Serial;
+ESPImpl ESP;

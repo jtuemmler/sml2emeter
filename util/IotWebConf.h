@@ -5,6 +5,8 @@
 #ifndef IOTWEBCONFIG_H
 #define IOTWEBCONFIG_H
 
+#include <Arduino.h>
+
 static const byte IOTWEBCONF_STATE_BOOT = 0;
 static const byte IOTWEBCONF_STATE_NOT_CONFIGURED = 1;
 static const byte IOTWEBCONF_STATE_AP_MODE = 2;
@@ -34,17 +36,17 @@ public:
 
 class IotWebConfParameter {
 public:
-   IotWebConfParameter() {}
+   IotWebConfParameter() : visible(true), errorMessage("") {}
    IotWebConfParameter(
       const char* label, const char* id, char* valueBuffer, int length,
       const char* type = "text", const char* placeholder = NULL,
       const char* defaultValue = NULL, const char* customHtml = NULL,
-      bool visible = true) {
+      bool visible = true) : errorMessage("") {
       this->visible = visible;
    }
    IotWebConfParameter(
       const char* id, char* valueBuffer, int length, const char* customHtml,
-      const char* type = "text") {}
+      const char* type = "text") : visible(true), errorMessage("") {}
 
    const char *getId() { return "Id"; }
    bool visible;

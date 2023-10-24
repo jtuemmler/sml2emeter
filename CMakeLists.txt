@@ -21,6 +21,8 @@ add_executable(sml2emeter
    emeterpacket.h
    counter.h
    counter.cpp
+   pulsecounter.h
+   pulsecounter.cpp
    webconfparameter.h
    util/main.cpp
    util/sml_testpacket.h
