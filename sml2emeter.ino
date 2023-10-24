@@ -28,7 +28,7 @@
 #include "smlstreamreader.h"
 #include "smlparser.h"
 #include "emeterpacket.h"
-#include "counter.h"
+#include "pulsecounter.h"
 #include "webconfparameter.h"
 
 // ----------------------------------------------------------------------------
@@ -112,29 +112,8 @@ bool ledState = false;
 // Time to change the state of the led
 unsigned long nextLedChange = 0;
 
-// Timeout for pulse-counting. If set to 0, impulse counting is turned off.
-volatile unsigned long pulseTimeoutMs = 0;
-
-// Indicates wether the beginning of an impulse has been detected
-volatile int isrArmed = 0;
-
-// Indicates the last state of the impulse-pin (HIGH / LOW)
-volatile int isrLastState = -2;
-
-// Counted impulses
-volatile unsigned long impulses = 0UL;
-
-// Counted interrupts
-volatile unsigned long interruptCount = 0UL;
-
-// Time (ticks) of the last received impulse
-volatile unsigned long lastPulseEventMs = 0UL;
-
-// Persisted instance of the impulse counter
-Counter impulseCounter;
-
-// Factor for m3 calculation
-float pulseFactor = 0.01f;
+// Pulse-counter instance
+PulseCounter pulseCounter(PULSE_INPUT_PIN);
 
 // Additional serial port to mirror SML messages
 SoftwareSerial mirrorSerial;
@@ -257,57 +236,15 @@ void delayMs(unsigned long delayMs) {
       }      
       delay(1);
    }
-   storeImpulseCounter();
-}
-
-/**
-   @brief Store the detected number of impulses in flash.
-*/
-void storeImpulseCounter() {
-   if (pulseTimeoutMs > 0) {
-      uint32_t currentImpulses = 0;
-      noInterrupts();
-      currentImpulses = impulses;
-      interrupts();
-      while (currentImpulses > impulseCounter.get()) {
-         Serial.print("s");
-         impulseCounter.increment();
-      }
-   }
+   pulseCounter.store();
 }
 
 /**
    @brief Handle interrupt from pulse-counter
 */
 ICACHE_RAM_ATTR void handlePulseInterrupt() {
-   // Check whether impulses should be detected.
-   if (pulseTimeoutMs > 0) {
-      // Check whether the state if the dection pin has been changed.
-      int state = digitalRead(PULSE_INPUT_PIN);
-      if (state == isrLastState) {
-         return;
-      }
-      isrLastState = state;
-
-      // State has changed ...
-      unsigned long currentTimeMs = millis();
-
-      // If we changed from HIGH -> LOW, the beginning of an impulse has been detected.
-      // Now wait until the signal is released ...
-      if (state == LOW) {
-         lastPulseEventMs = currentTimeMs;
-         isrArmed = 1;
-      }
-      else if ((state == HIGH) && (isrArmed == 1)) {
-         // Signal was released and we've detected the beginning before.
-         isrArmed = 0;
-         // Now check if the debounce-timeout has been elapsed. If so, count the impulse.
-         if (((currentTimeMs - lastPulseEventMs) > pulseTimeoutMs) || (currentTimeMs < lastPulseEventMs)) {
-            ledOnFor(2000);
-            ++impulses;
-            Serial.print("i");
-         }
-      }
+   if (pulseCounter.handleInterrupt()) {
+      ledOnFor(2000);
    }
 }
 
@@ -426,11 +363,15 @@ String getCurrentDataAsJson(bool detailed = true) {
       data += (unsigned int)readErrors;
       data += ",\"ParseErrors\":";
       data += (unsigned int)(smlParser.getParseErrors() + smlStreamReader.getParseErrors());
-      if (pulseTimeoutMs > 0) {
+
+      unsigned long impulses;
+      float m3;
+      pulseCounter.get(impulses, m3);
+      if (impulses > 0) {
          data += ",\"Impulses\":";
          data += impulses;
          data += ",\"m^3\":";
-         data += impulses * pulseFactor;
+         data += m3;
       }
       if (mqttPort > 0) {
          data += ",\"MqttClientState\":";
@@ -532,20 +473,7 @@ void configSaved() {
       mqttClient.setServer(mqttBrockerAddressParam.getText(), mqttPort);
    }
 
-   pulseTimeoutMs = pulseTimeoutMsParam.getInt();
-   pulseFactor = pulseFactorParam.getFloat();
-
-   if (pulseTimeoutMs > 0) {
-      // Attach interrupt-handler
-      Serial.print("Pulse-Pin: ");
-      Serial.println(PULSE_INPUT_PIN);
-      Serial.print("Interrupt: ");
-      Serial.println(digitalPinToInterrupt(PULSE_INPUT_PIN));
-      attachInterrupt(digitalPinToInterrupt(PULSE_INPUT_PIN), handlePulseInterrupt, CHANGE);
-   }
-   else {
-      detachInterrupt(digitalPinToInterrupt(PULSE_INPUT_PIN));
-   }
+   pulseCounter.updateConfig(handlePulseInterrupt, pulseTimeoutMsParam.getInt(), pulseFactorParam.getFloat());
 }
 
 /**
@@ -583,7 +511,6 @@ void flashInfo() {
 void setup() {
    // Initialize the LED_BUILTIN pin as an output
    pinMode(LED_BUILTIN, OUTPUT);
-   pinMode(PULSE_INPUT_PIN, INPUT_PULLUP);
 
    // Open serial communications and wait for port to open
    Serial.begin(9600);
@@ -604,8 +531,7 @@ void setup() {
    Serial.print("MAC address: ");
    Serial.println(WiFi.macAddress());
 
-   impulseCounter.init(1000, 4096);
-   impulses = impulseCounter.get();
+   pulseCounter.init(1000, 4096);
 
    serialNumberParam.setInt(990000000 + ESP.getChipId());
    portParam.setInt(SMA_ENERGYMETER_PORT);
@@ -703,28 +629,22 @@ void publishMqtt() {
       ++mqttSendErrors;
    }
 
-   if (pulseTimeoutMs > 0) {
+   unsigned long mqttImpulses;
+   float mqttM3;
+   pulseCounter.get(mqttImpulses, mqttM3);
+   if ((mqttImpulses > 0) && (mqttLastPublishedImpulses != mqttImpulses))
+   {
       unsigned long currentTimeMs = millis();
-
-      // Fetch data into local storage
-      noInterrupts();
-      unsigned long mqttImpulses = impulses;
-      unsigned long mqttInterruptCount = interruptCount;
-      unsigned long mqttLastPulseEventMs = lastPulseEventMs;
-      interrupts();
-
-      if (mqttLastPublishedImpulses != mqttImpulses) {
-         char buffer[100];
-         sprintf(buffer, "{\"ts\":%lu, \"ets\":%lu, \"imp\":%lu, \"m3\":%g, \"intr\":%lu}", currentTimeMs, mqttLastPulseEventMs, mqttImpulses, mqttImpulses * pulseFactor, mqttInterruptCount);
-
-         if (mqttClient.publish(mqttTopicImpulses.c_str(), buffer)) {
-            mqttLastPublishedImpulses = mqttImpulses;
-            Serial.print("I");
-         }
-         else {
-            Serial.print("E");
-            Serial.print(mqttClient.state());
-         }
+      char buffer[100];
+      sprintf(buffer, "{\"ts\":%lu, \"imp\":%lu, \"m3\":%g}", currentTimeMs, mqttImpulses, mqttM3);
+      
+      if (mqttClient.publish(mqttTopicImpulses.c_str(), buffer)) {
+         mqttLastPublishedImpulses = mqttImpulses;
+         Serial.print("I");
+      }
+      else {
+         Serial.print("E");
+         Serial.print(mqttClient.state());
       }
    }
 }
