@@ -112,9 +112,6 @@ bool ledState = false;
 // Time to change the state of the led
 unsigned long nextLedChange = 0;
 
-// Pulse-counter instance
-PulseCounter pulseCounter = PulseCounter::getInstance();
-
 // Additional serial port to mirror SML messages
 SoftwareSerial mirrorSerial;
 
@@ -236,7 +233,7 @@ void delayMs(unsigned long delayMs) {
       }      
       delay(1);
    }
-   pulseCounter.store();
+   storePulseCounter();
 }
 
 /**
@@ -357,7 +354,7 @@ String getCurrentDataAsJson(bool detailed = true) {
 
       unsigned long impulses;
       float m3;
-      pulseCounter.get(impulses, m3);
+      getPulseCounter(impulses, m3);
       if (impulses > 0) {
          data += ",\"Impulses\":";
          data += impulses;
@@ -464,7 +461,7 @@ void configSaved() {
       mqttClient.setServer(mqttBrockerAddressParam.getText(), mqttPort);
    }
 
-   pulseCounter.updateConfig(pulseTimeoutMsParam.getInt(), pulseFactorParam.getFloat());
+   updatePulseCounterConfig(pulseTimeoutMsParam.getInt(), pulseFactorParam.getFloat());
 }
 
 /**
@@ -522,7 +519,7 @@ void setup() {
    Serial.print("MAC address: ");
    Serial.println(WiFi.macAddress());
 
-   pulseCounter.init(PULSE_INPUT_PIN, 1000, 4096);
+   initPulseCounter(PULSE_INPUT_PIN, 1000, 4096);
 
    serialNumberParam.setInt(990000000 + ESP.getChipId());
    portParam.setInt(SMA_ENERGYMETER_PORT);
@@ -622,7 +619,8 @@ void publishMqtt() {
 
    unsigned long mqttImpulses;
    float mqttM3;
-   pulseCounter.get(mqttImpulses, mqttM3);
+   getPulseCounter(mqttImpulses, mqttM3);
+
    if ((mqttImpulses > 0) && (mqttLastPublishedImpulses != mqttImpulses))
    {
       unsigned long currentTimeMs = millis();
