@@ -66,6 +66,12 @@ public:
       s.append(RHS);
       return s;
    }
+
+   friend String operator + (const char LHS[], const String& RHS) {
+      String s(LHS);
+      s.append(RHS);
+      return s;
+   }
 };
 
 #ifndef _WIN32
@@ -92,6 +98,7 @@ unsigned long millis();
 #define D2 2
 #define D3 3
 #define D4 4
+#define D5 5
 
 void digitalWrite(byte gpio, byte value);
 byte digitalRead(byte gpio);
