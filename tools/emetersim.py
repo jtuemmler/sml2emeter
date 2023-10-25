@@ -1,7 +1,4 @@
 #!/usr/bin/python3
-import serial
-import sys
-
 #
 # Script to test sml2emeter without a real energy meter
 #
@@ -19,11 +16,10 @@ import sys
 # python3 emetersim.py writer 0 1
 #
 
-if (len(sys.argv) == 1):
-	print('Usage: {} [COM-Port] {{[enable-error-message]}} {{[use-rtscts]}}'.format(sys.argv[0]))
-	quit()
+from serial import Serial, SerialException
+from argparse import ArgumentParser
 
-smlData = [
+sml_packets = [
 	# OK
 	['OK000', '1b1b1b1b01010101760552f15800620062007263010176010102310b0a01445a4700ff00ff00726201641da6aa620263906300760553f15800620062007263070177010b0a01445a4700ff00ff00070100620affff726201641da6aa7577070100603201010172620162006200520004445a470177070100600100ff017262016200620052000b0a01445a4700ff00ff000177070100010800ff641c01047262016200621e52ff642678f40177070100020800ff017262016200621e52ff62000177070100100700ff017262016200621b52fe5300000101016301e700760554f1580062006200726302017101636079000000001b1b1b1b1a036004'],
 	['OK256', '1b1b1b1b01010101760552f15800620062007263010176010102310b0a01445a4700ff00ff00726201641da6aa620263906300760553f15800620062007263070177010b0a01445a4700ff00ff00070100620affff726201641da6aa7577070100603201010172620162006200520004445a470177070100600100ff017262016200620052000b0a01445a4700ff00ff000177070100010800ff641c01047262016200621e52ff642678f40177070100020800ff017262016200621e52ff62000177070100100700ff017262016200621b52fe5301000101016345ec00760554f1580062006200726302017101636079000000001b1b1b1b1a03f714'],
@@ -45,29 +41,41 @@ smlData = [
 	['ETOc  ', '']
 ]
 
-ENABLE_ERROR_MESSAGES = False
-if (len(sys.argv) > 2):
-	ENABLE_ERROR_MESSAGES = (sys.argv[2] == '1')
+parser = ArgumentParser(prog = 'SML E-Meter-Simulator',
+						description = 'Test script to send SML messages to a serial port.')
+parser.add_argument('com_port', help='COM-Port to use for sending messages')
+parser.add_argument('-e', '--errormsgs', dest='error_messages', action='store_true', help='Send also error messages.', default=False)
+parser.add_argument('--rtscts', dest = 'rtscts', action='store_true', help='Enable RTS/CTS', default=False)
+parser.add_argument('--dsrdtr', dest = 'dsrdtr', action='store_true', help='Enable DSR/DTR', default=False)
 
-RTSCTS = False
-if (len(sys.argv) > 3):
-	RTSCTS = (sys.argv[3] == '1')
+args = parser.parse_args()
 
-if (not(ENABLE_ERROR_MESSAGES)):
-	del smlData[4:]
+# Optionally remove messages with errors
+if not(args.error_messages):
+	sml_packets = [e for e in sml_packets if e[0].startswith('OK')]
 
-for i in range(len(smlData)):
-	smlData[i][1] = bytearray.fromhex(smlData[i][1])
+# Convert messages to byte-arrays ...
+for i in range(len(sml_packets)):
+	sml_packets[i][1] = bytearray.fromhex(sml_packets[i][1])
 
-with serial.Serial(sys.argv[1], timeout=1, rtscts=RTSCTS, dsrdtr=RTSCTS) as ser:
-	index = 0
+try:
+	with Serial(args.com_port, timeout=1, rtscts=args.rtscts, dsrdtr=args.dsrdtr) as serial_port:
+		index = 0
 
-	while True:
-		data = ser.read()
-		if (len(data) > 0):
-			print(data.decode(encoding = 'utf-8', errors = 'ignore'), end='')
+		while True:
+			data = serial_port.read()
+			if (len(data) > 0):
+				print(data.decode(encoding = 'utf-8', errors = 'ignore'), end='')
 			
-		else:
-			print('[->{}]'.format(smlData[index][0]), end='')
-			ser.write(smlData[index][1])
-			index = (index + 1) % len(smlData)
+			else:
+				(description, packet) = sml_packets[index]
+				print(f'[->{description}]', end='')
+				serial_port.write(packet)
+				index = (index + 1) % len(sml_packets)
+
+except SerialException as ex:
+	print(f'\nException: {ex}')
+	print(f'Please check if the com-port is correct and not used by another program.')
+
+except KeyboardInterrupt:
+	print('\nStop.')
