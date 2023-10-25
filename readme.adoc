@@ -1,6 +1,6 @@
 = D0-SML to SMA Energy Meter converter
 Joern Tuemmler
-v1.4, April 2020: Final
+v1.6, October 2023: Final
 :doctype: article
 :encoding: utf-8
 :lang: en
@@ -64,7 +64,7 @@ As additional dependencies you need:
 Install these libraries via the Arduino IDE.
 
 .Configuration
-After compiling and flashing the software, the ESP8266 provides a WiFi access point with the name *sml2emeter*. To configure the software, connect to this access point with the password *sml2emeter*. If supported by your mobile device, you will be automatically redirected to the web-server of the ESP. If not, open a web-browser and enter the IP-address *192.168.4.1*.
+After compiling and flashing the software, the ESP8266 provides a WiFi access point with the name *sml2emeter*. To configure the software, connect to this access point with the password *sml2emeter*. If supported by your mobile device, you will automatically be redirected to the web-server of the ESP. If not, open a web-browser and enter the IP-address *192.168.4.1*.
 
 If everything works you should see an image like in [1].
 
@@ -77,33 +77,51 @@ To configure the ESP, press the [Configuration] button.
 If the device was already configured, you are asked for a username and password. The username is *admin* and the password the current AP password.
 ====
 
-The configuration page is divided into three sections: WiFi configuration [2] and meter configuration [3]. Since version 1.4 it is also possible to configure a MQTT broker.
+The configuration page is divided into four sections: WiFi configuration [2], meter configuration [3],  MQTT configuration [4] and finally pulse-counting configuration [5].
 
-.WiFi configuration
+.WiFi configuration [2]
 
 Thing name:: Name of the device. This name is also used when in AP mode.
-AP password:: Password to connect to the device when in AP mode (*mandatory*). This password is also needed to change the configuration once the device is set up.
+AP password:: Password to connect to the device when in AP mode (*mandatory*). This password needs to be changed once the configuration of the device is done.
 WiFi SSID:: The name of the WiFi network (*mandatory*).
 WiFi password:: The password to connect to the WiFi network (*mandatory*).
 
-.Meter configuration
+.Meter configuration [3]
 
 Unicast address 1/2:: Up to two unicast addresses may be specified as destination for energy-meter telegrams. If none is set, the default SMA energy meter multicast address (239.12.255.254) is used.
 Port:: Destination port for the energy-meter telegrams (default 9522). If any other port greater than 0 is set, raw SML packets will be send. If this value is set to 0, sending of energy-meter telegrams is turned off.
 Serial number:: The serial number which is used in the energy-meter telegrams.
 
-.MQTT configuration
+.MQTT configuration [4]
 
 Broker address:: Hostname of the MQTT broker.
 Broker port:: Port of the MQTT broker (default 1883). If this value is set to 0, publishing MQTT data is turned off.
 
-If MQTT is enabled, the sketch publishes each telegram received from the energy-meter as JSON object on topic /{thing name}/data.
+If MQTT is enabled, the sketch publishes each telegram received from the energy-meter as JSON object on topic {thing name}/data.
 
 .Example using the mosquitto_sub command to print out received data
 ....
 > mosquitto_sub -v -t "#"
-/sml2emeter/data {"PowerIn":297.32,"EnergyIn":4059843.70,"PowerOut":0.00,"EnergyOut":0.00}
+sml2emeter/data {"PowerIn":297.32,"EnergyIn":4059843.70,"PowerOut":0.00,"EnergyOut":0.00}
 ....
+
+.Pulse counting configuration [5]
+
+The pulse-counting may be used to count impulses from a gas-meter. For this, a reed-sensor must be attached to GPIO D1.
+
+Debounce time:: This value defines, how long (in ms) the signal of the reed-contact must be LOW until it is counted as an impulse. If this value is 0, pulse-counting is turned off.
+Factor for m3 calculation:: This value defines a factor to translate the impulses into a volume.
+
+[NOTE]
+====
+If pulse-counting is enabled, then the MQTT messages contains two additional fields:
+....
+> mosquitto_sub -v -t "#"
+sml2emeter/data {"PowerIn":297.32,"EnergyIn":4059843.70,"PowerOut":0.00,"EnergyOut":0.00,"Impulses":123,"m3":1.23}
+....
+
+It's possibe to attach an LED to D5 to get a visual feed-back when the software has detected a LOW signal.
+====
 
 .REST interface
 
@@ -118,7 +136,7 @@ The returned JSON object is similar to the data published via MQTT:
 
 === Raspberry Pi
 
-The software was originally developed for an ESP8266. Experimental support for the Raspberry Pi has been added and tested with a RaspberryPi 2. This version comes without a WebUI and MQTT support.
+The software was originally developed for an ESP8266. Experimental support for the Raspberry Pi has been added and tested with a RaspberryPi 2. This version comes without a WebUI, MQTT and pulse-counting support.
 
 ==== Hardware
 
@@ -159,6 +177,8 @@ Start the application by specifying the port, e.g.:
 === Developing on a PC
 
 For faster and more comfortable development it is possible to use https://visualstudio.microsoft.com/de/[Visual Studio] or a GNU toolchain for compiling the sketch and running it on a PC. To create a solution, you need to run https://cmake.org[CMake] first.
+
+In python-script in the tools folder may be used to simulate a SML meter and to test everything without a real meter.
 
 === Links
 
