@@ -5,6 +5,9 @@
 // Input pin for detecting impulses
 static int inputPin;
 
+// Debug pin for detecting impulses
+static int debugPin;
+
 // Indicates, whether pulse-counting is enabled
 static volatile bool enabled;
 
@@ -32,6 +35,22 @@ static float pulseFactor;
 // Persisted instance of the impulse counter
 static Counter impulseCounter;
 
+/*
+ * Observations have shown that the reed sensor triggers twice when the magnet in the
+ * counting-wheel passes by:
+ * 
+ * HIGH -----------+           +---+     +-------------
+ *                 |           |   |     |
+ *                 |           |   |     |
+ *                 |           |   |     |
+ * LOW             +-----------+   +-----+
+ *                     dt1           dt2
+ *             
+ * The solution here is to count only those transitions which last for a given minimum
+ * time (-> pulseTimeoutMs). Shorter low-periods will be ignored.
+ * As dt1 >= pulseTimeoutMs it is counted as an impulse.
+ * dt2 is smaller than pulseTimeoutMs and is ignored.
+ */
 ICACHE_RAM_ATTR static void handleInterrupt() {
    if (enabled) {
       // Check whether the state if the dection pin has been changed.
@@ -49,10 +68,12 @@ ICACHE_RAM_ATTR static void handleInterrupt() {
       if (state == LOW) {
          lastPulseEventMs = currentTimeMs;
          isrArmed = true;
+         digitalWrite(debugPin, HIGH);
       }
       else if ((state == HIGH) && isrArmed) {
          // Signal was released and we've detected the beginning before.
          isrArmed = false;
+         digitalWrite(debugPin, LOW);
          // Now check if the debounce-timeout has been elapsed. If so, count the impulse.
          if (((currentTimeMs - lastPulseEventMs) > pulseTimeoutMs) || (currentTimeMs < lastPulseEventMs)) {
             ++impulses;
@@ -62,9 +83,10 @@ ICACHE_RAM_ATTR static void handleInterrupt() {
    }
 }
 
-void initPulseCounter(int inputPinIn, uint16_t sector, uint32_t sectorSize)
+void initPulseCounter(int inputPinIn, int debugPinIn, uint16_t sector, uint32_t sectorSize)
 {
    inputPin = inputPinIn;
+   debugPin = debugPinIn;
    pulseTimeoutMs = 0UL;
    isrArmed = false;
    isrLastState = -2;
@@ -74,6 +96,8 @@ void initPulseCounter(int inputPinIn, uint16_t sector, uint32_t sectorSize)
    pulseFactor = 0.01f;
 
    pinMode(inputPin, INPUT_PULLUP);
+   pinMode(debugPin, OUTPUT);
+   digitalWrite(debugPin, LOW);
 
    impulseCounter.init(sector, sectorSize);
    impulses = impulseCounter.get();
@@ -116,10 +140,7 @@ void getPulseCounter(unsigned long& impulsesOut, float& m3Out) {
       // Fetch data into local storage
       noInterrupts();
       impulsesOut = impulses;
-      //unsigned long mqttInterruptCount = interruptCount;
-      //unsigned long mqttLastPulseEventMs = lastPulseEventMs;
       interrupts();
-
    }
    else {
       impulsesOut = 0;

@@ -6,10 +6,11 @@
 /**
 * @brief Initialize pulse counting and restore last state from flash.
 * @param inputPin Pin to use for pulse-counting.
+* @param debugPin Pin to use for debugging.
 * @param sector First sector used for persisting the counter.
 * @param sectorSize Size (in bytes) of a sector.
 */
-void initPulseCounter(int inputPin, uint16_t sector, uint32_t sectorSize);
+void initPulseCounter(int inputPin, int debugPin, uint16_t sector, uint32_t sectorSize);
 
 /**
 * @brief Persist current state to flash.

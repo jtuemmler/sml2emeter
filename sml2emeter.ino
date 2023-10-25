@@ -36,7 +36,7 @@
 // ----------------------------------------------------------------------------
 
 // Application version
-const char VERSION[] = "Version 1.5.E";
+const char VERSION[] = "Version 1.6";
 
 // Controls wether to mirror all incoming serial data to another serial output (set to -1 to disable)
 const int MIRROR_SERIAL_PIN = D2;
@@ -57,6 +57,7 @@ const uint16_t SMA_ENERGYMETER_PORT = 9522;
 
 // PIN for pulse-counting
 const int PULSE_INPUT_PIN = D1;
+const int PULSE_DEBUG_PIN = D5;
 
 // ----------------------------------------------------------------------------
 // Constants for IotWebConf
@@ -139,10 +140,8 @@ HTTPUpdateServer httpUpdater;
 WiFiClient wifiClient;
 PubSubClient mqttClient(wifiClient);
 String mqttTopic;
-String mqttTopicImpulses;
 int mqttPort = 0;
 int mqttRetryCounter = 0;
-unsigned long mqttLastPublishedImpulses = 0UL;
 
 // IotWebConf instance
 IotWebConf iotWebConf(THING_NAME, &dnsServer, &server, WIFI_INITIAL_AP_PASSWORD, CONFIG_VERSION);
@@ -159,8 +158,8 @@ WebConfParameter mqttBrockerAddressParam(iotWebConf, "Hostname", "mqttBrockerAdd
 WebConfParameter mqttPortParam(iotWebConf, "Port (default 1883, 0 to turn off)", "mqttPort", NUMBER_LEN, "number", "0", "min='0' max='65535' step='1'");
 
 WebConfParameter separator3(iotWebConf, "Pulse counting");
-WebConfParameter pulseTimeoutMsParam(iotWebConf, "Timeout for pulse-counter (ms)", "pulseTimeoutMs", NUMBER_LEN, "number", "0", "min='0' max='100000' step='1'");
-WebConfParameter pulseFactorParam(iotWebConf, "Factor for pulse-counter", "pulseFactor", NUMBER_LEN, "number", "0.01", "min='0' max='100000' step='0.01'");
+WebConfParameter pulseTimeoutMsParam(iotWebConf, "Debounce time (default 500ms, 0 to turn off)", "pulseTimeoutMs", NUMBER_LEN, "number", "0", "min='0' max='100000' step='1'");
+WebConfParameter pulseFactorParam(iotWebConf, "Factor for m3 calculation", "pulseFactor", NUMBER_LEN, "number", "0.01", "min='0' max='100000' step='0.01'");
 
 /**
    @brief Turn status led on
@@ -330,7 +329,11 @@ void handleRoot()
    @param detailed Return detailed data if true
 */
 String getCurrentDataAsJson(bool detailed = true) {
+   bool addComma = false;
+   
    String data = "{";
+
+   // Basic data of energy-meter
    if (smlParser.getParsedOk() > 0) {
       data += "\"PowerIn\":";
       data += smlParser.getPowerIn() / 100.0;
@@ -340,34 +343,43 @@ String getCurrentDataAsJson(bool detailed = true) {
       data += smlParser.getPowerOut() / 100.0;
       data += ",\"EnergyOut\":";
       data += smlParser.getEnergyOut() / 100.0;
-      if (detailed) {
-         data += ",";
-      }
+      addComma = true;
    }
+
+   // Detailed data of energy-meter
    if (detailed) {
+      data += addComma ? "," : "";
       data += "\"Ok\":";
       data += (unsigned int)smlParser.getParsedOk();
       data += ",\"ReadErrors\":";
       data += (unsigned int)readErrors;
       data += ",\"ParseErrors\":";
       data += (unsigned int)(smlParser.getParseErrors() + smlStreamReader.getParseErrors());
-
-      unsigned long impulses;
-      float m3;
-      getPulseCounter(impulses, m3);
-      if (impulses > 0) {
-         data += ",\"Impulses\":";
-         data += impulses;
-         data += ",\"m^3\":";
-         data += m3;
-      }
-      if (mqttPort > 0) {
-         data += ",\"MqttClientState\":";
-         data += mqttClient.state();
-         data += ",\"MqttSendErrors\":";
-         data += (unsigned int)mqttSendErrors;
-      }
+      addComma = true;
    }
+
+   // Impulse-counting
+   unsigned long impulses;
+   float m3;
+   getPulseCounter(impulses, m3);
+   if (impulses > 0) {
+      data += addComma ? "," : "";
+      data += "\"Impulses\":";
+      data += impulses;
+      data += ",\"m3\":";
+      data += m3;
+      addComma = true;
+   }
+
+   // MQTT state
+   if (detailed && (mqttPort > 0)) {
+      data += addComma ? "," : "";
+      data += "\"MqttClientState\":";
+      data += mqttClient.state();
+      data += ",\"MqttSendErrors\":";
+      data += (unsigned int)mqttSendErrors;
+   }
+   
    data += "}";
 
    return data;
@@ -454,11 +466,10 @@ void configSaved() {
    mqttClient.disconnect();
    mqttPort = mqttBrockerAddressParam.isEmpty() ? 0 : mqttPortParam.getInt();
    if (mqttPort > 0) {
-      mqttTopic = String("/") + iotWebConf.getThingName() + String("/data");
-      mqttTopicImpulses = String("/") + iotWebConf.getThingName() + String("/impulses");
-
+      mqttTopic = iotWebConf.getThingName() + String("/data");
       Serial.print("mqttTopic: "); Serial.println(mqttTopic);
       mqttClient.setServer(mqttBrockerAddressParam.getText(), mqttPort);
+      mqttRetryCounter = 0;
    }
 
    updatePulseCounterConfig(pulseTimeoutMsParam.getInt(), pulseFactorParam.getFloat());
@@ -519,7 +530,7 @@ void setup() {
    Serial.print("MAC address: ");
    Serial.println(WiFi.macAddress());
 
-   initPulseCounter(PULSE_INPUT_PIN, 1000, 4096);
+   initPulseCounter(PULSE_INPUT_PIN, PULSE_DEBUG_PIN, 1000, 4096);
 
    serialNumberParam.setInt(990000000 + ESP.getChipId());
    portParam.setInt(SMA_ENERGYMETER_PORT);
@@ -615,26 +626,6 @@ void publishMqtt() {
       Serial.print("E");
       Serial.print(mqttClient.state());
       ++mqttSendErrors;
-   }
-
-   unsigned long mqttImpulses;
-   float mqttM3;
-   getPulseCounter(mqttImpulses, mqttM3);
-
-   if ((mqttImpulses > 0) && (mqttLastPublishedImpulses != mqttImpulses))
-   {
-      unsigned long currentTimeMs = millis();
-      char buffer[100];
-      sprintf(buffer, "{\"ts\":%lu, \"imp\":%lu, \"m3\":%g}", currentTimeMs, mqttImpulses, mqttM3);
-      
-      if (mqttClient.publish(mqttTopicImpulses.c_str(), buffer)) {
-         mqttLastPublishedImpulses = mqttImpulses;
-         Serial.print("I");
-      }
-      else {
-         Serial.print("E");
-         Serial.print(mqttClient.state());
-      }
    }
 }
 
