@@ -58,10 +58,18 @@ Follow the instructions on the https://github.com/esp8266/Arduino[ESP8266 github
 
 As additional dependencies you need:
 
+* ESP8255 board support, Version 2.7.4
 * https://github.com/prampec/IotWebConf[IotWebConf, Version 2.3.0] for general WiFi setup and WebUI
 * https://github.com/knolleary/pubsubclient[PubSubClient, Version 2.7.0] for MQTT support
 
 Install these libraries via the Arduino IDE.
+
+.Flash layout
+
+The pulse-counting feature stores the number of counted impulses in flash. To reserve flash, use the following layout: 
+
+*4MB FS 1MB, OTA*
+
 
 .Configuration
 After compiling and flashing the software, the ESP8266 provides a WiFi access point with the name *sml2emeter*. To configure the software, connect to this access point with the password *sml2emeter*. If supported by your mobile device, you will automatically be redirected to the web-server of the ESP. If not, open a web-browser and enter the IP-address *192.168.4.1*.
@@ -178,7 +186,7 @@ Start the application by specifying the port, e.g.:
 
 For faster and more comfortable development it is possible to use https://visualstudio.microsoft.com/de/[Visual Studio] or a GNU toolchain for compiling the sketch and running it on a PC. To create a solution, you need to run https://cmake.org[CMake] first.
 
-In python-script in the tools folder may be used to simulate a SML meter and to test everything without a real meter.
+The python-script in the tools folder may be used to simulate a SML meter and to test everything without a real meter.
 
 === Links
 
