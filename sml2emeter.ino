@@ -289,6 +289,7 @@ void readSerial() {
             ledOff();
             waitCount = 0;
             ++readErrors;
+            break;
          }
          delayMs(10);
       }
