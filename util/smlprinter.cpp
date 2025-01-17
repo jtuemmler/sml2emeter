@@ -5,8 +5,9 @@
 
 #include "sml_testpacket.h"
 #include "sml_demodata.h"
+#include "../smlstreamreader.h"
 
-uint8_t* getOctetString(uint8_t *pBuffer, int *pBufferSize, uint8_t *pPacket, const int length) {
+const uint8_t* getOctetString(uint8_t *pBuffer, int *pBufferSize, const uint8_t *pPacket, const int length) {
    ++pPacket;
    *pBufferSize = (length < *pBufferSize) ? length : *pBufferSize;
    for (int i = 0; i < *pBufferSize; ++i) {
@@ -15,7 +16,7 @@ uint8_t* getOctetString(uint8_t *pBuffer, int *pBufferSize, uint8_t *pPacket, co
    return pPacket + length;
 }
 
-uint8_t* getInt(int64_t *pValue, uint8_t *pPacket, const int length) {
+const uint8_t* getInt(int64_t *pValue, const uint8_t *pPacket, const int length) {
    ++pPacket;
    *pValue = 0;
    for (int i = 1; i < length; ++i) {
@@ -24,7 +25,7 @@ uint8_t* getInt(int64_t *pValue, uint8_t *pPacket, const int length) {
    return pPacket;
 }
 
-uint8_t* getUint(uint64_t *pValue, uint8_t *pPacket, const int length) {
+const uint8_t* getUint(uint64_t *pValue, const uint8_t *pPacket, const int length) {
    ++pPacket;
    *pValue = 0;
    for (int i = 1; i < length; ++i) {
@@ -33,13 +34,13 @@ uint8_t* getUint(uint64_t *pValue, uint8_t *pPacket, const int length) {
    return pPacket;
 }
 
-uint8_t* getBool(uint8_t *pValue, uint8_t *pPacket, const int length) {
+const uint8_t* getBool(uint8_t *pValue, const uint8_t *pPacket, const int length) {
    ++pPacket;
    *pValue = *(pPacket++);
    return pPacket;
 }
 
-uint8_t* printHex(uint8_t *pPacket, const int length, const int depth, const char* pMessage) {
+const uint8_t* printHex(const uint8_t *pPacket, const int length, const int depth, const char* pMessage) {
    for (int i = 0; i < depth; ++i) {
       printf("   ");
    }
@@ -54,7 +55,7 @@ uint8_t* printHex(uint8_t *pPacket, const int length, const int depth, const cha
    return pPacket;
 }
 
-uint8_t* printString(uint8_t *pPacket, const int length, const int depth) {
+const uint8_t* printString(const uint8_t *pPacket, const int length, const int depth) {
    char s[100] = { 0 };
    strncpy(s, "string = ", sizeof(s));
    for (int i = 1; i < length; ++i) {
@@ -73,12 +74,10 @@ uint8_t* printString(uint8_t *pPacket, const int length, const int depth) {
 #define SML_UINT_ID 0x60
 #define SML_LIST_ID 0x70
 
-void parseSml(uint8_t* pPacket) {
+void parseSml(const uint8_t* pPacket) {
    char message[100];
    int listStack[10] = { 0 };
    int depth = 1;
-   // Skip intro and version
-   pPacket += 8;
    listStack[1] = 1;
    do {
       // Take current element from list-stack
@@ -139,7 +138,39 @@ void parseSml(uint8_t* pPacket) {
    } while (depth > 0);
 }
 
+void parseFile(int argc, char** argv) {
+   printf("Parsing file: %s\n", argv[1]);
+
+   SmlStreamReader smlReader(1000);
+   int parsed = 0;
+   FILE* pFile = fopen(argv[1], "rb");
+   if (pFile) {
+      uint8_t buffer[100];
+      while (!feof(pFile)) {
+         int bytesRead = fread(buffer, 1, sizeof(buffer), pFile);
+         if (smlReader.addData(buffer, bytesRead) > 0) {
+            parsed++;
+            printf("Packet %d, size: %d\n", parsed, smlReader.getLength());
+            //printHex(smlReader.getData(), smlReader.getLength(), 0, "");
+            parseSml(smlReader.getData());
+         }
+      }
+   }
+}
+
 int main(int argc, char** argv) {
-   parseSml((uint8_t*)SML_DATA[1].data);
+   if (argc > 1) {
+      if (strcmp(argv[1], "demo") == 0) {
+         // Parse demo packet without start-marker and version (1b1b1b1b 01010101)
+         parseSml(SML_DATA[1].data + 8);
+      }
+      else {
+         parseFile(argc, argv);
+      }
+   }
+   else {
+      printf("Usage: smlprinter demo\n");
+      printf("       smlprinter <filename>\n");
+   }
    return 0;
 }
