@@ -16,21 +16,24 @@
  * - Begin:    1b 1b 1b 1b       // Start of message; this is also the escape sequence
  * - Version:  01 01 01 01       // version identifier for version 1
  * - Data:     xx xx xx xx       // any data
+ * - Padding:  0-3 * 00          // padding bytes to make the payload-length a multiple of 4
  * - End:      1b 1b 1b 1b       // End of message; this is also the escape sequence
  * - Crc:      1a xx ch cl       // CRC. xx = number of padding bytes, ch = crc16 high, cl = crc16 low
  * 
  * Escaping:
- * - If the payload contains the escape sequence 1b 1b 1b 1b, then
+ * - If the payload contains the escape sequence 1b 1b 1b 1b, then the escape sequence is transmitted twice (1b 1b 1b 1b becomes 1b 1b 1b 1b  1b 1b 1b 1b).
  */
 class SmlStreamReader {
 public:
    /**
     * @brief Contruct a new stream reader
     * @param maxPacketSize Reserved memory for a packet in bytes.
+    * @param checkCrcErrors Enables CRC checking (on by default).
     */
-   SmlStreamReader(int maxPacketSize) : 
+   SmlStreamReader(int maxPacketSize, bool checkCrcErrors = true) : 
       _currentState(&SmlStreamReader::stateReadData),
       _maxPacketSize(maxPacketSize),
+      _checkCrcErrors(checkCrcErrors),
       _escLen(0), 
       _escData(0U), 
       _parseErrors(0U),
@@ -96,6 +99,7 @@ private:
 
    bool(SmlStreamReader::*_currentState)(uint8_t);
    int _maxPacketSize;
+   bool _checkCrcErrors;
    int _escLen;
    uint32_t _escData;
    uint32_t _parseErrors;
@@ -147,7 +151,7 @@ private:
             _crc16.calc(0x1a);
             _crc16.calc(spareBytes);
             _crc16Expected = _escData & SML_CRC_MASK;
-            if (_crc16Expected != _crc16.getCrc()) {
+            if (_checkCrcErrors && (_crc16Expected != _crc16.getCrc())) {
                //printf("Reader: Warning %04x != %04x\n", _crc16Expected, crc16.getCrc());
                ++_parseErrors;
                return false;

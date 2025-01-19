@@ -141,11 +141,11 @@ void parseSml(const uint8_t* pPacket) {
 void parseFile(int argc, char** argv) {
    printf("Parsing file: %s\n", argv[1]);
 
-   SmlStreamReader smlReader(1000);
+   SmlStreamReader smlReader(1000, false);
    int parsed = 0;
    FILE* pFile = fopen(argv[1], "rb");
    if (pFile) {
-      uint8_t buffer[100];
+      uint8_t buffer[1];
       while (!feof(pFile)) {
          int bytesRead = fread(buffer, 1, sizeof(buffer), pFile);
          if (smlReader.addData(buffer, bytesRead) > 0) {
