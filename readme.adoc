@@ -16,7 +16,7 @@ This sketch reads SML telegrams from an infrared D0 interface of a smart meter a
 
 So far it has been tested with the following meters:
 
-* https://www.dzg.de/fileadmin/dzg/content/downloads/produkte-zaehler/dvs74/dzg_dvs74_handbuch.pdf[DWS74] from Deutsche Zählergesellschaft Oranienburg mbH
+* https://www.dzg.de/fileadmin/dzg/content/downloads/produkte-zaehler/dvs74/DZG_DVS74_DWS74_Handbuch_240119.pdf[DWS74] from Deutsche Zählergesellschaft Oranienburg mbH
 
 As hardware you need:
 
@@ -31,7 +31,7 @@ The source-code and the information in this document is provided _as is_. Use it
 ====
 
 ****
-Thanks to Frank Carius for sharing his work. https://www.msxfaq.de/sonst/bastelbude/smartmeter_d0_sml.code.htm[His sketch] was the initial basis of this sketch.
+Thanks to Frank Carius for sharing his work. https://www.msxfaq.de/sonst/bastelbude/smartmeter/smartmeter_smlcode.htm[His sketch] was the initial basis of this sketch.
 ****
 
 == Setup
@@ -192,8 +192,8 @@ The python-script in the tools folder may be used to simulate a SML meter and to
 
 * https://www.bsi.bund.de/SharedDocs/Downloads/DE/BSI/Publikationen/TechnischeRichtlinien/TR03109/TR-03109-1_Anlage_Feinspezifikation_Drahtgebundene_LMN-Schnittstelle_Teilb.pdf?__blob=publicationFile[Technische Richtlinie BSI TR-03109-1 / SML]
 * https://www.bundesnetzagentur.de/DE/Beschlusskammern/BK06/BK6_83_Zug_Mess/835_mitteilungen_datenformate/Mitteilung_26/Anlagen/Codeliste_OBIS_24a.pdf?__blob=publicationFile&v=1[OBIS-Kennzahlen-System]
-* https://www.promotic.eu/en/pmdoc/Subsystems/Comm/PmDrivers/IEC62056_OBIS.htm[OBIS codes]
-* https://developer.sma.de/fileadmin/content/global/Partner/Documents/SMA_Labs/EMETER-Protokoll-TI-de-10.pdf[SMA ENERGY METER Zählerprotokoll]
+* https://www.promotic.eu/en/pmdoc/Subsystems/Comm/PmDrivers/PmIEC62056/IEC62056_OBIS.htm[OBIS codes]
+* https://cdn.sma.de/fileadmin/content/www.developer.sma.de/docs/EMETER-Protokoll-TI-en-10.pdf?v=1699276024[SMA ENERGY METER Zählerprotokoll]
 
 === Example SML message
 
